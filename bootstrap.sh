@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPOSITORY="${DEVBOX_REPOSITORY:-https://github.com/Inaolol/devbox.git}"
-REF="${DEVBOX_REF:-main}"
+REF="${DEVBOX_REF:-master}"
 TARGET="${DEVBOX_DIR:-$HOME/.local/share/devbox}"
 
 command -v git >/dev/null 2>&1 || {

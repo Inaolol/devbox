@@ -28,13 +28,13 @@ cd devbox
 After reviewing the repository, the one-command installer is:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh | bash
 ```
 
 Pass installer options after `bash -s --`, for example:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/main/bootstrap.sh | bash -s -- --without-ai
+curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh | bash -s -- --without-ai
 ```
 
 ## Options
