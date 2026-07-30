@@ -1,146 +1,130 @@
-# DevBox: native Omaterm for Debian and Ubuntu
+# DevBox
 
-A host-native translation of
-[Omaterm](https://learn.omacom.io/4/the-omaterm-manual) for Ubuntu Server and
-Debian. It provides the familiar headless development environment used by
-Omaterm and inspired by [Omarchy](https://github.com/basecamp/omarchy), without
-requiring Arch Linux, a desktop environment, or a development container.
+An Omakase terminal setup for Debian and Ubuntu. Think of it as a host-native [Omaterm](https://learn.omacom.io/4/the-omaterm-manual), bringing the familiar headless [Omarchy](https://github.com/basecamp/omarchy) experience to machines that are not running Arch.
 
-The package and service layer is translated to Debian/Ubuntu. The shell,
-LazyVim, tmux, and shared configuration come from the same
-[`omacom-io/omadots`](https://github.com/omacom-io/omadots) source used by
-Omaterm.
+## What it sets up
 
-## Supported systems
+- **Shell**: Bash with the official [Omadots](https://github.com/omacom-io/omadots), Starship, fzf, eza, zoxide, bat, and tmux
+- **Editors**: Neovim with LazyVim, plus Vim for plain TTY sessions
+- **Agents**: OpenCode, Claude Code, Codex, Gemini, and Pi
+- **Dev tools**: mise, Node, Docker, Compose, buildx, GitHub CLI (`gh`), lazygit, lazydocker, Hunk, and Basecamp CLI
+- **Networking**: OpenSSH and Tailscale
+- **Git**: Optional setup for user name/email and GitHub authentication
 
-The installer detects the distribution and release codename automatically from `/etc/os-release`.
+System packages are installed through Debian or Ubuntu repositories wherever possible. Current release binaries are used where the distribution packages do not match Omaterm's requirements. The development and AI tools follow Omaterm's current `mise.packages` manifest.
 
-- Ubuntu Server 24.04 LTS or newer
-- Debian 12 (Bookworm)
-- Debian 13 (Trixie)
-- amd64 or arm64 architecture
+## Install
 
-Run it as a normal sudo-enabled user, not as root. Minimal Debian installations
-must have `sudo` installed and configured before running the bootstrap command.
-
-## Installs
-
-- Shell environment: Omadots, Starship, eza, fzf, zoxide, bat, fd, ripgrep
-- Terminal workflow: tmux, Neovim with LazyVim, Vim, lazygit, lazydocker
-- Development: mise, Node, compiler/build tools, Docker Engine, Compose, buildx
-- Agents and CLIs: OpenCode, Claude Code, Codex, Gemini, Pi, Hunk, Basecamp CLI
-- Services: OpenSSH, GitHub CLI, Tailscale
-
-The tool lists track Omaterm's current `arch.packages` and `mise.packages`,
-translated to packages and release assets that work on Debian and Ubuntu.
-
-## Safe installation
-
-```bash
-git clone https://github.com/Inaolol/devbox.git
-cd devbox
-./tests/test.sh
-./install.sh
-```
-
-After reviewing the repository, the one-command installer is:
+Run this as a normal sudo-enabled user, not as root:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh | bash
 ```
 
-Pass installer options after `bash -s --`, for example:
+This supports:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh | bash -s -- --without-ai
-```
+- Ubuntu Server 24.04 LTS or newer
+- Debian 12 (Bookworm)
+- Debian 13 (Trixie)
+- amd64 and arm64
 
-## Options
+Minimal Debian installations must have `sudo` installed and configured first.
 
-```bash
-./install.sh --dry-run
-./install.sh --without-ai
-./install.sh --without-tailscale
-./install.sh --only docker
-./install.sh --only configs
-./install.sh --only services
-```
+Open a new login session after installation. DevBox will attach interactive terminals to the shared `Work` tmux session, just like Omaterm.
 
-## Distribution handling
+## Setup
 
-Ubuntu and Debian use the same installation flow. Docker's repository is selected automatically:
-
-- Ubuntu: `https://download.docker.com/linux/ubuntu`
-- Debian: `https://download.docker.com/linux/debian`
-
-The detected release codename is used in the repository entry, such as `noble`, `bookworm`, or `trixie`.
-
-## After installation
-
-Open a new login session. Interactive terminal sessions automatically attach
-to the shared `Work` tmux session, matching Omaterm. Disable that behavior for
-a session with:
-
-```bash
-DEVBOX_NO_TMUX=1 bash
-```
-
-Run the optional Omaterm-style onboarding:
+Run the first-time service setup:
 
 ```bash
 devbox-setup
 ```
 
-It can configure Git identity, GitHub authentication, Tailscale with Tailscale
-SSH, and an SSH public key. Individual steps are also available:
+This offers Git identity, GitHub authentication, Tailscale with Tailscale SSH, and SSH public-key setup. Run a section directly when needed:
 
 ```bash
 devbox-setup git
 devbox-setup github
 devbox-setup tailscale
-devbox-setup ssh --key 'ssh-ed25519 AAAA...'
+devbox-setup ssh --key "ssh-ed25519 AAAA..."
 ```
 
-Password SSH authentication is never disabled automatically. To explicitly
-switch to key-only SSH after installing and validating a public key:
+Password SSH remains enabled by default. Switch to key-only SSH explicitly after confirming the key works:
 
 ```bash
-devbox-setup ssh --key 'ssh-ed25519 AAAA...' --disable-password-auth
+devbox-setup ssh \
+  --key "ssh-ed25519 AAAA..." \
+  --disable-password-auth
 ```
 
-Sign out and back in once so Docker group membership takes effect.
+The helper validates the key and the resulting OpenSSH configuration before reloading SSH.
 
-## Storage recommendation
+## Options
 
-Install the operating system, Docker, databases, and active projects on the SSD. Mount the HDD at `/data` for backups, media, archives, and large persistent volumes.
+Pass installer options after `bash -s --`:
 
-## Security
+```bash
+curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh |
+  bash -s -- --without-ai
+```
 
-The installer never stores tokens or API keys. Existing managed configuration files are backed up before replacement. It does not modify SSH authentication policy or open public firewall ports.
+Available options:
 
-Docker-published container ports bypass UFW rules. Restrict published ports
-with rules in Docker's `DOCKER-USER` chain; do not rely on UFW alone for them.
+```text
+--without-ai
+--without-tailscale
+--only base
+--only docker
+--only tailscale
+--only terminal
+--only ai
+--only configs
+--only services
+--dry-run
+```
+
+Set `DEVBOX_NO_TMUX=1` before starting Bash to skip automatic tmux attachment:
+
+```bash
+DEVBOX_NO_TMUX=1 bash
+```
+
+## Updating
+
+Run the installer again. The bootstrap fetches the current `master` branch and reapplies the setup:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh | bash
+```
+
+Existing managed configuration is moved to timestamped backups before replacement.
 
 ## Omaterm compatibility
 
-This project follows Omaterm's setup order:
+DevBox follows the same setup order as Omaterm:
 
-1. Install native system and development packages.
+1. Install the native system and development packages.
 2. Install the official Omadots configuration.
 3. Install Omaterm's mise-managed tools.
-4. Offer Git, GitHub, Tailscale, and SSH onboarding.
+4. Configure Git, GitHub, Tailscale, and SSH.
 5. Enter tmux for interactive terminal work.
 
-Important tmux keys:
+The checked-in tmux configuration mirrors current Omadots. Installation uses fresh upstream Omadots as the authoritative source.
 
-- `Ctrl+Space` primary prefix, `Ctrl+B` secondary prefix
-- `Alt+Enter` split vertically
-- `Alt+Shift+Enter` split horizontally
-- `Alt+Escape` kill pane
-- `Ctrl+Alt+Arrow` move between panes
-- `Alt+Left/Right` move between windows
-- `Alt+1` through `Alt+9` select a window
-- `Prefix + ?` show all tmux bindings
+Useful aliases include:
 
-The checked-in tmux file mirrors current Omadots, while installation uses the
-fresh upstream Omadots configuration as the authoritative source.
+```text
+t    attach to tmux
+n    open Neovim
+v    open Vim
+d    run Docker
+lzd  open lazydocker
+c    open OpenCode
+cx   open Claude Code
+```
+
+## Security
+
+The installer does not store API keys or tokens. Unattended setup values are read only when explicitly supplied through `DEVBOX_SETUP_*` environment variables.
+
+Docker-published container ports bypass UFW rules. Restrict them through Docker's `DOCKER-USER` chain rather than relying on UFW alone.
