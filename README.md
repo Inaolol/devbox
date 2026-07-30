@@ -28,7 +28,8 @@ This supports:
 - Debian 13 (Trixie)
 - amd64 and arm64
 
-Minimal Debian installations must have `sudo` installed and configured first.
+Minimal Debian installations must have `curl` and `sudo` installed first, with
+the user configured for sudo access.
 
 Open a new login session after installation. DevBox will attach interactive terminals to the shared `Work` tmux session, just like Omaterm.
 
