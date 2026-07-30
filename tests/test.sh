@@ -81,4 +81,19 @@ if OS_RELEASE_FILE="$tmp/unsupported" detect_supported_os 2>/dev/null; then
   exit 1
 fi
 
+# Debian 13 does not provide software-properties-common. Keep Ubuntu-only
+# packages out of the shared Debian base package list.
+# shellcheck disable=SC1091
+source "$ROOT/scripts/install-base.sh"
+base_packages=()
+log() { :; }
+run() { :; }
+install_apt_packages() { base_packages=("$@"); }
+OS_ID=debian
+install_base
+if [[ " ${base_packages[*]} " == *" software-properties-common "* ]]; then
+  echo "Debian base packages include unavailable software-properties-common" >&2
+  exit 1
+fi
+
 echo "All tests passed"
