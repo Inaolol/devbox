@@ -73,7 +73,8 @@ require_supported_os() {
 backup_path() {
   local path="$1"
   if [[ -e "$path" || -L "$path" ]]; then
-    local backup="${path}.backup.$(date +%Y%m%d%H%M%S)"
+    local backup
+    backup="${path}.backup.$(date +%Y%m%d%H%M%S)"
     run mv "$path" "$backup"
     log "Backed up $path to $backup"
   fi

@@ -15,6 +15,8 @@ fi
 grep -q 'set -Eeuo pipefail' "$ROOT/install.sh"
 grep -q 'require_supported_os' "$ROOT/install.sh"
 grep -q 'docker-ce' "$ROOT/scripts/install-docker.sh"
+# The literal placeholder must appear in the installer.
+# shellcheck disable=SC2016
 grep -q 'download.docker.com/linux/${OS_ID}' "$ROOT/scripts/install-docker.sh"
 grep -q 'nvim-linux-x86_64.tar.gz' "$ROOT/scripts/install-terminal.sh"
 grep -q '0.10.0' "$ROOT/scripts/install-terminal.sh"
@@ -24,7 +26,8 @@ grep -q 'prefix2 C-b' "$ROOT/configs/tmux.conf"
 grep -q 'omacom-io/omadots' "$ROOT/scripts/install-configs.sh"
 
 # Test OS detection independently of the host running the test.
-# shellcheck source=../scripts/lib.sh
+# ROOT is computed at runtime, so ShellCheck cannot resolve this source path.
+# shellcheck disable=SC1091
 source "$ROOT/scripts/lib.sh"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
