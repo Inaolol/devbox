@@ -1,0 +1,30 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu 24.04
+            image: ubuntu:24.04
+          - name: Debian 12
+            image: debian:12
+          - name: Debian 13
+            image: debian:13
+    steps:
+      - name: Install test dependencies
+        run: apt-get update && apt-get install -y ca-certificates git shellcheck
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: ./tests/test.sh

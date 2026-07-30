@@ -1,0 +1,18 @@
+add_newline = true
+command_timeout = 1000
+format = "$username$hostname$directory$git_branch$git_status$docker_context$character"
+
+[hostname]
+ssh_only = true
+format = "[@$hostname]($style) "
+
+[directory]
+truncation_length = 4
+truncate_to_repo = false
+
+[git_branch]
+format = "[$symbol$branch]($style) "
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
