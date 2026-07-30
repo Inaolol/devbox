@@ -1,0 +1,9 @@
+# Native Debian/Ubuntu additions to the upstream Omadots shell configuration.
+export PATH="$HOME/.local/bin:$PATH"
+
+# Omaterm manual aliases that are not currently defined by Omadots.
+alias v='vim'
+alias lzd='lazydocker'
+
+# Native Docker Compose convenience, retained for existing DevBox users.
+alias dc='docker compose'

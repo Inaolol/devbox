@@ -1,6 +1,15 @@
-# DevBox
+# DevBox: native Omaterm for Debian and Ubuntu
 
-A repeatable Ubuntu Server and Debian setup that installs the terminal and development tools used in an Omarchy-style workflow directly on the host.
+A host-native translation of
+[Omaterm](https://learn.omacom.io/4/the-omaterm-manual) for Ubuntu Server and
+Debian. It provides the familiar headless development environment used by
+Omaterm and inspired by [Omarchy](https://github.com/basecamp/omarchy), without
+requiring Arch Linux, a desktop environment, or a development container.
+
+The package and service layer is translated to Debian/Ubuntu. The shell,
+LazyVim, tmux, and shared configuration come from the same
+[`omacom-io/omadots`](https://github.com/omacom-io/omadots) source used by
+Omaterm.
 
 ## Supported systems
 
@@ -16,7 +25,14 @@ must have `sudo` installed and configured before running the bootstrap command.
 
 ## Installs
 
-Docker Engine and Compose, Tailscale, OpenSSH, the official Omadots shell configuration used by Omaterm, Omaterm-compatible tmux hotkeys, LazyVim, Starship, fzf, ripgrep, fd, bat, zoxide, mise, GitHub CLI, lazygit, lazydocker, Codex, Claude Code, Gemini CLI, and OpenCode.
+- Shell environment: Omadots, Starship, eza, fzf, zoxide, bat, fd, ripgrep
+- Terminal workflow: tmux, Neovim with LazyVim, Vim, lazygit, lazydocker
+- Development: mise, Node, compiler/build tools, Docker Engine, Compose, buildx
+- Agents and CLIs: OpenCode, Claude Code, Codex, Gemini, Pi, Hunk, Basecamp CLI
+- Services: OpenSSH, GitHub CLI, Tailscale
+
+The tool lists track Omaterm's current `arch.packages` and `mise.packages`,
+translated to packages and release assets that work on Debian and Ubuntu.
 
 ## Safe installation
 
@@ -47,6 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh 
 ./install.sh --without-tailscale
 ./install.sh --only docker
 ./install.sh --only configs
+./install.sh --only services
 ```
 
 ## Distribution handling
@@ -60,13 +77,35 @@ The detected release codename is used in the repository entry, such as `noble`, 
 
 ## After installation
 
+Open a new login session. Interactive terminal sessions automatically attach
+to the shared `Work` tmux session, matching Omaterm. Disable that behavior for
+a session with:
+
 ```bash
-sudo tailscale up
-gh auth login
-codex
-claude
-gemini
-opencode
+DEVBOX_NO_TMUX=1 bash
+```
+
+Run the optional Omaterm-style onboarding:
+
+```bash
+devbox-setup
+```
+
+It can configure Git identity, GitHub authentication, Tailscale with Tailscale
+SSH, and an SSH public key. Individual steps are also available:
+
+```bash
+devbox-setup git
+devbox-setup github
+devbox-setup tailscale
+devbox-setup ssh --key 'ssh-ed25519 AAAA...'
+```
+
+Password SSH authentication is never disabled automatically. To explicitly
+switch to key-only SSH after installing and validating a public key:
+
+```bash
+devbox-setup ssh --key 'ssh-ed25519 AAAA...' --disable-password-auth
 ```
 
 Sign out and back in once so Docker group membership takes effect.
@@ -84,7 +123,13 @@ with rules in Docker's `DOCKER-USER` chain; do not rely on UFW alone for them.
 
 ## Omaterm compatibility
 
-This project installs the same `omacom-io/omadots` configuration that Omaterm uses, but directly on Ubuntu Server or Debian. That preserves the official shell behavior, LazyVim setup, and tmux bindings without running the terminal environment inside Docker.
+This project follows Omaterm's setup order:
+
+1. Install native system and development packages.
+2. Install the official Omadots configuration.
+3. Install Omaterm's mise-managed tools.
+4. Offer Git, GitHub, Tailscale, and SSH onboarding.
+5. Enter tmux for interactive terminal work.
 
 Important tmux keys:
 
@@ -97,4 +142,5 @@ Important tmux keys:
 - `Alt+1` through `Alt+9` select a window
 - `Prefix + ?` show all tmux bindings
 
-The exact upstream configuration remains available in `omacom-io/omadots`; this repository pins a reviewed compatible copy for predictable installation.
+The checked-in tmux file mirrors current Omadots, while installation uses the
+fresh upstream Omadots configuration as the authoritative source.

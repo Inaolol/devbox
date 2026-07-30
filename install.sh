@@ -12,7 +12,7 @@ usage() {
 Usage: ./install.sh [options]
 
 Options:
-  --only COMPONENT       Install one component: base, docker, tailscale, terminal, ai, configs
+  --only COMPONENT       Install one component: base, docker, tailscale, terminal, ai, configs, services
   --without-ai           Skip AI command line tools
   --without-tailscale    Skip Tailscale
   --dry-run              Print commands without executing them
@@ -50,6 +50,7 @@ source "$REPO_ROOT/scripts/install-tailscale.sh"
 source "$REPO_ROOT/scripts/install-terminal.sh"
 source "$REPO_ROOT/scripts/install-ai.sh"
 source "$REPO_ROOT/scripts/install-configs.sh"
+source "$REPO_ROOT/scripts/install-services.sh"
 
 run_component base install_base
 run_component docker install_docker
@@ -57,5 +58,6 @@ if [[ "$WITHOUT_TAILSCALE" -eq 0 ]]; then run_component tailscale install_tailsc
 run_component terminal install_terminal
 if [[ "$WITHOUT_AI" -eq 0 ]]; then run_component ai install_ai; fi
 run_component configs install_configs
+run_component services install_services
 
 log "Installation complete. Sign out and back in if Docker group access was added."

@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 install_terminal() {
   log "Installing terminal and development tools"
-  install_apt_packages tmux ripgrep fd-find fzf bash-completion bat
+  # Debian/Ubuntu equivalents of Omaterm's headless Arch package set.
+  # build-essential, git, jq and OpenSSH are installed by install-base.sh.
+  install_apt_packages \
+    tmux ripgrep fd-find fzf bash-completion bat \
+    clang llvm libyaml-dev luarocks \
+    less man-db vim whois kitty-terminfo
 
   mkdir -p "$HOME/.local/bin"
   install_neovim
@@ -25,6 +30,8 @@ install_terminal() {
     if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install mise"; else curl https://mise.run | sh; fi
   fi
 
+  install_eza
+  install_gum
   install_github_cli
   install_lazygit
   install_lazydocker
@@ -77,6 +84,40 @@ install_github_cli() {
 
 latest_github_release_tag() {
   curl -fsSL "https://api.github.com/repos/$1/releases/latest" | jq -r .tag_name
+}
+
+install_eza() {
+  command -v eza >/dev/null 2>&1 && return
+  [[ "${DRY_RUN:-0}" -eq 1 ]] && { echo "+ install latest eza release"; return; }
+
+  local version tmp target
+  version="$(latest_github_release_tag eza-community/eza)"
+  case "$(dpkg --print-architecture)" in
+    amd64) target="x86_64-unknown-linux-gnu" ;;
+    arm64) target="aarch64-unknown-linux-gnu" ;;
+    *) warn "Unsupported architecture for automatic eza installation"; return 1 ;;
+  esac
+
+  tmp="$(mktemp -d)"
+  curl -fsSL "https://github.com/eza-community/eza/releases/download/${version}/eza_${target}.tar.gz" |
+    tar -xz -C "$tmp"
+  install -m 0755 "$tmp/eza" "$HOME/.local/bin/eza"
+  rm -rf "$tmp"
+}
+
+install_gum() {
+  command -v gum >/dev/null 2>&1 && return
+  run sudo mkdir -p -m 755 /etc/apt/keyrings
+  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
+    echo "+ add Charm apt key and repository"
+  else
+    curl -fsSL https://repo.charm.sh/apt/gpg.key |
+      sudo gpg --dearmor --yes -o /etc/apt/keyrings/charm.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" |
+      sudo tee /etc/apt/sources.list.d/charm.list >/dev/null
+  fi
+  run sudo apt-get update
+  install_apt_packages gum
 }
 
 install_lazygit() {

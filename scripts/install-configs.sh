@@ -1,34 +1,21 @@
 #!/usr/bin/env bash
 install_configs() {
   log "Installing Omaterm-compatible shell, tmux, and LazyVim configuration"
-  mkdir -p "$HOME/.config/tmux"
-
-  install_managed_file "$REPO_ROOT/configs/tmux.conf" "$HOME/.config/tmux/tmux.conf"
-  ln -snf "$HOME/.config/tmux/tmux.conf" "$HOME/.tmux.conf"
-
   install_omadots
-
-  local marker_start='# >>> devbox >>>'
-  if ! grep -Fq "$marker_start" "$HOME/.bashrc" 2>/dev/null; then
-    cat >> "$HOME/.bashrc" <<'BASHRC'
-
-# >>> devbox >>>
-export PATH="$HOME/.local/bin:$PATH"
-alias dc='docker compose'
-# <<< devbox <<<
-BASHRC
-  fi
 }
 
 install_omadots() {
   local temp_dir
-  temp_dir="$(mktemp -d)"
 
   if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    echo "+ clone https://github.com/omacom-io/omadots.git and install its shell/LazyVim configs"
+    echo "+ clone https://github.com/omacom-io/omadots.git and install its authoritative shell, tmux, and LazyVim configs"
+    echo "+ preserve existing configuration with timestamped backups"
+    echo "+ install Debian/Ubuntu Omaterm aliases and safe interactive tmux startup"
     return
   fi
 
+  temp_dir="$(mktemp -d)"
+  trap 'rm -rf "$temp_dir"' RETURN
   git clone --depth 1 https://github.com/omacom-io/omadots.git "$temp_dir/omadots"
 
   if [[ -e "$HOME/.config/nvim" ]]; then
@@ -37,11 +24,22 @@ install_omadots() {
   git clone --depth 1 https://github.com/LazyVim/starter "$HOME/.config/nvim"
   rm -rf "$HOME/.config/nvim/.git"
 
+  local upstream_path target
   mkdir -p "$HOME/.config"
-  cp -rf "$temp_dir/omadots/config/." "$HOME/.config/"
+  for upstream_path in "$temp_dir"/omadots/config/*; do
+    target="$HOME/.config/$(basename "$upstream_path")"
+    # nvim was deliberately created from LazyVim/starter immediately above.
+    if [[ "$(basename "$upstream_path")" != "nvim" && ( -e "$target" || -L "$target" ) ]]; then
+      backup_path "$target"
+    fi
+    cp -rf "$upstream_path" "$HOME/.config/"
+  done
 
-  # Keep this repository's reviewed tmux file authoritative while matching upstream.
-  install -m 0644 "$REPO_ROOT/configs/tmux.conf" "$HOME/.config/tmux/tmux.conf"
+  # Omadots stays authoritative. These only fill native-server gaps in the
+  # Omaterm manual that are not currently present in shared Omadots aliases.
+  install -m 0644 "$REPO_ROOT/configs/shell/devbox-server" \
+    "$HOME/.config/shell/devbox-server"
+
   ln -snf "$HOME/.config/tmux/tmux.conf" "$HOME/.tmux.conf"
 
   backup_path "$HOME/.bashrc"
@@ -53,24 +51,24 @@ install_omadots() {
 [[ $- != *i* ]] && return
 
 source ~/.config/shell/all
+source ~/.config/shell/devbox-server
 
-# Debian and Ubuntu package fzf's shell integration as documentation examples.
+# Debian and Ubuntu package fzf shell integration lives in a different path
+# from Arch's, which is the location checked by Omadots.
 [[ -f /usr/share/doc/fzf/examples/completion.bash ]] && source /usr/share/doc/fzf/examples/completion.bash
 [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
 
-# DevBox additions
-export PATH="$HOME/.local/bin:$PATH"
-alias dc='docker compose'
+# Omaterm starts tmux for terminal connections. These checks keep SSH commands,
+# scp/sftp, cron, and nested tmux shells unaffected. Set DEVBOX_NO_TMUX=1 to opt out.
+if [[ -z ${TMUX:-} && -z ${DEVBOX_NO_TMUX:-} &&
+      ${TERM:-dumb} != dumb && -t 0 && -t 1 ]] &&
+   command -v tmux >/dev/null 2>&1; then
+  tmux attach 2>/dev/null || tmux new-session -s Work
+fi
 BASHRC
   echo '. ~/.bashrc' > "$HOME/.bash_profile"
   ln -snf "$HOME/.config/shell/inputrc" "$HOME/.inputrc"
 
   rm -rf "$temp_dir"
-}
-
-install_managed_file() {
-  local source="$1" target="$2"
-  mkdir -p "$(dirname "$target")"
-  if [[ -e "$target" ]] && ! cmp -s "$source" "$target"; then backup_path "$target"; fi
-  run install -m 0644 "$source" "$target"
+  trap - RETURN
 }

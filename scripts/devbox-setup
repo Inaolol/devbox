@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  devbox-setup                         Run the interactive onboarding
+  devbox-setup git [--name NAME --email EMAIL]
+  devbox-setup github [--with-token]  Authenticate with GitHub (token is read from stdin)
+  devbox-setup tailscale [--hostname NAME] [--auth-key KEY]
+  devbox-setup ssh --key PUBLIC_KEY [--disable-password-auth]
+
+The SSH command adds a validated public key. Password authentication is changed
+only when --disable-password-auth is explicitly supplied and a valid key is
+already present in ~/.ssh/authorized_keys.
+USAGE
+}
+
+die() {
+  echo "devbox-setup: $*" >&2
+  exit 1
+}
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || die "$1 is required"
+}
+
+prompt() {
+  local message="$1" value
+  [[ -r /dev/tty ]] || die "interactive input requires a terminal"
+  printf '%s' "$message" >/dev/tty
+  IFS= read -r value </dev/tty
+  printf '%s' "$value"
+}
+
+confirm() {
+  local answer
+  [[ -r /dev/tty ]] || return 1
+  printf '%s [y/N] ' "$1" >/dev/tty
+  IFS= read -r answer </dev/tty
+  [[ "$answer" == [yY] || "$answer" == [yY][eE][sS] ]]
+}
+
+setup_git() {
+  local name="" email=""
+  while (($#)); do
+    case "$1" in
+      --name) name="${2:-}"; shift 2 ;;
+      --email) email="${2:-}"; shift 2 ;;
+      *) die "unknown git option: $1" ;;
+    esac
+  done
+
+  need git
+  name="${name:-$(git config --global user.name 2>/dev/null || true)}"
+  email="${email:-$(git config --global user.email 2>/dev/null || true)}"
+  name="${name:-$(prompt 'Git name: ')}"
+  email="${email:-$(prompt 'Git email: ')}"
+  [[ -n "$name" && -n "$email" ]] || die "both Git name and email are required"
+  git config --global user.name "$name"
+  git config --global user.email "$email"
+  echo "✓ Git identity configured for $name <$email>"
+}
+
+setup_github() {
+  local with_token=0
+  while (($#)); do
+    case "$1" in
+      --with-token) with_token=1; shift ;;
+      *) die "unknown github option: $1" ;;
+    esac
+  done
+
+  need gh
+  if gh auth status --hostname github.com >/dev/null 2>&1; then
+    echo "✓ GitHub is already authenticated"
+    return
+  fi
+
+  if ((with_token)); then
+    gh auth login --hostname github.com --git-protocol https --with-token
+  else
+    [[ -t 0 || -r /dev/tty ]] || die "run this command from a terminal, or pipe a token to: devbox-setup github --with-token"
+    gh auth login --hostname github.com --git-protocol https --web
+  fi
+  gh auth setup-git
+  echo "✓ GitHub authentication configured"
+}
+
+valid_hostname() {
+  [[ "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$ ]]
+}
+
+setup_tailscale() {
+  local hostname="" auth_key=""
+  while (($#)); do
+    case "$1" in
+      --hostname) hostname="${2:-}"; shift 2 ;;
+      --auth-key) auth_key="${2:-}"; shift 2 ;;
+      *) die "unknown tailscale option: $1" ;;
+    esac
+  done
+
+  need tailscale
+  hostname="${hostname:-$(hostname -s)}"
+  valid_hostname "$hostname" || die "invalid Tailscale hostname: $hostname"
+
+  local args=(up --ssh --accept-routes "--hostname=$hostname")
+  [[ -z "$auth_key" ]] || args+=("--auth-key=$auth_key")
+  sudo tailscale "${args[@]}"
+  echo "✓ Tailscale connected as $hostname with Tailscale SSH enabled"
+}
+
+validate_public_key() {
+  local key="$1" key_file status
+  key_file="$(mktemp)"
+  printf '%s\n' "$key" >"$key_file"
+  if ssh-keygen -l -f "$key_file" >/dev/null 2>&1; then
+    status=0
+  else
+    status=1
+  fi
+  rm -f "$key_file"
+  return "$status"
+}
+
+authorized_keys_has_valid_key() {
+  local line
+  [[ -r "$HOME/.ssh/authorized_keys" ]] || return 1
+  while IFS= read -r line; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    if validate_public_key "$line"; then
+      return 0
+    fi
+  done <"$HOME/.ssh/authorized_keys"
+  return 1
+}
+
+disable_password_ssh() {
+  authorized_keys_has_valid_key ||
+    die "refusing to disable password SSH: no valid key is present in ~/.ssh/authorized_keys"
+
+  # OpenSSH uses the first value it encounters. Debian/Ubuntu include this
+  # directory near the top of sshd_config, so sort before vendor/cloud files.
+  local dropin="/etc/ssh/sshd_config.d/00-devbox-key-only.conf"
+  local candidate backup=""
+  candidate="$(mktemp)"
+  printf '%s\n' \
+    '# Installed explicitly by devbox-setup ssh --disable-password-auth' \
+    'PasswordAuthentication no' \
+    'KbdInteractiveAuthentication no' >"$candidate"
+
+  if sudo test -e "$dropin"; then
+    backup="$(mktemp)"
+    sudo cp "$dropin" "$backup"
+  fi
+
+  sudo install -o root -g root -m 0644 "$candidate" "$dropin"
+  if ! sudo sshd -t ||
+    ! sudo sshd -T | grep -qx 'passwordauthentication no' ||
+    ! sudo sshd -T | grep -qx 'kbdinteractiveauthentication no'; then
+    if [[ -n "$backup" ]]; then
+      sudo install -o root -g root -m 0644 "$backup" "$dropin"
+      rm -f "$backup"
+    else
+      sudo rm -f "$dropin"
+    fi
+    rm -f "$candidate"
+    die "OpenSSH rejected the configuration; the previous configuration was restored"
+  fi
+  [[ -z "$backup" ]] || rm -f "$backup"
+  rm -f "$candidate"
+  sudo systemctl reload ssh
+  echo "✓ Password and keyboard-interactive SSH authentication disabled"
+}
+
+setup_ssh() {
+  local key="" disable_password=0
+  while (($#)); do
+    case "$1" in
+      --key) key="${2:-}"; shift 2 ;;
+      --disable-password-auth) disable_password=1; shift ;;
+      *) die "unknown ssh option: $1" ;;
+    esac
+  done
+
+  need ssh-keygen
+  key="${key:-$(prompt 'SSH public key: ')}"
+  [[ -n "$key" ]] || die "an SSH public key is required"
+  validate_public_key "$key" || die "invalid SSH public key"
+
+  install -d -m 0700 "$HOME/.ssh"
+  touch "$HOME/.ssh/authorized_keys"
+  chmod 0600 "$HOME/.ssh/authorized_keys"
+  if ! grep -qxF "$key" "$HOME/.ssh/authorized_keys"; then
+    printf '%s\n' "$key" >>"$HOME/.ssh/authorized_keys"
+  fi
+  echo "✓ SSH public key installed"
+
+  if ((disable_password)); then
+    disable_password_ssh
+  fi
+}
+
+interactive_setup() {
+  echo "Devbox service onboarding (inspired by Omaterm)"
+  echo
+  if confirm "Configure Git identity?"; then setup_git; fi
+  if confirm "Authenticate with GitHub?"; then setup_github; fi
+  if command -v tailscale >/dev/null 2>&1 && confirm "Connect Tailscale and enable Tailscale SSH?"; then
+    setup_tailscale
+  fi
+  if confirm "Add an SSH public key for remote access?"; then
+    setup_ssh
+  fi
+  echo
+  echo "Onboarding complete."
+}
+
+command="${1:-}"
+[[ -z "$command" ]] || shift
+case "$command" in
+  "") interactive_setup ;;
+  git) setup_git "$@" ;;
+  github) setup_github "$@" ;;
+  tailscale) setup_tailscale "$@" ;;
+  ssh) setup_ssh "$@" ;;
+  -h|--help|help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

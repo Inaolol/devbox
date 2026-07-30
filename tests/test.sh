@@ -5,15 +5,19 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 find "$ROOT" -type f -name '*.sh' -print0 | while IFS= read -r -d '' file; do
   bash -n "$file"
 done
+bash -n "$ROOT/scripts/devbox-setup" "$ROOT/configs/shell/devbox-server"
 
 if command -v shellcheck >/dev/null 2>&1; then
   find "$ROOT" -type f -name '*.sh' -print0 | xargs -0 shellcheck
+  shellcheck "$ROOT/scripts/devbox-setup"
+  shellcheck -s bash "$ROOT/configs/shell/devbox-server"
 else
   echo "shellcheck not installed; syntax checks completed"
 fi
 
 grep -q 'set -Eeuo pipefail' "$ROOT/install.sh"
 grep -q 'require_supported_os' "$ROOT/install.sh"
+grep -q 'run_component services install_services' "$ROOT/install.sh"
 grep -q 'docker-ce' "$ROOT/scripts/install-docker.sh"
 grep -q 'podman-docker' "$ROOT/scripts/install-docker.sh"
 grep -q 'DOCKER-USER' "$ROOT/scripts/install-docker.sh"
@@ -24,14 +28,25 @@ grep -q 'nvim-linux-x86_64.tar.gz' "$ROOT/scripts/install-terminal.sh"
 grep -q '0.11.2' "$ROOT/scripts/install-terminal.sh"
 grep -q 'bash-completion bat' "$ROOT/scripts/install-terminal.sh"
 grep -q 'command -v batcat' "$ROOT/scripts/install-terminal.sh"
+grep -q 'install_eza' "$ROOT/scripts/install-terminal.sh"
+grep -q 'install_gum' "$ROOT/scripts/install-terminal.sh"
+grep -q 'kitty-terminfo' "$ROOT/scripts/install-terminal.sh"
 # The literal release URL placeholders must appear in the installer.
 # shellcheck disable=SC2016
 grep -q 'lazygit_${version}_linux_${arch}.tar.gz' "$ROOT/scripts/install-terminal.sh"
+grep -q 'github:basecamp/basecamp-cli' "$ROOT/scripts/install-ai.sh"
+grep -q 'aqua:modem-dev/hunk' "$ROOT/scripts/install-ai.sh"
 grep -q 'No API keys are stored' "$ROOT/scripts/install-ai.sh"
 grep -q 'set -g prefix C-Space' "$ROOT/configs/tmux.conf"
 grep -q 'prefix2 C-b' "$ROOT/configs/tmux.conf"
 grep -q 'omacom-io/omadots' "$ROOT/scripts/install-configs.sh"
+# The literal HOME expression must appear in the installer.
+# shellcheck disable=SC2016
 grep -q 'backup_path "$HOME/.bashrc"' "$ROOT/scripts/install-configs.sh"
+grep -q 'DEVBOX_NO_TMUX' "$ROOT/scripts/install-configs.sh"
+grep -q "alias lzd='lazydocker'" "$ROOT/configs/shell/devbox-server"
+grep -q 'disable-password-auth' "$ROOT/scripts/devbox-setup"
+grep -q 'sshd -t' "$ROOT/scripts/devbox-setup"
 
 # Test OS detection independently of the host running the test.
 # ROOT is computed at runtime, so ShellCheck cannot resolve this source path.
