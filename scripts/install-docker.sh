@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 install_docker() {
   log "Installing Docker Engine from Docker's official ${OS_ID} repository"
+  remove_conflicting_docker_packages
   run sudo install -m 0755 -d /etc/apt/keyrings
 
   local docker_base_url="https://download.docker.com/linux/${OS_ID}"
@@ -23,4 +24,22 @@ install_docker() {
   install_apt_packages docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   run sudo systemctl enable --now docker
   if ! id -nG "$USER" | grep -qw docker; then run sudo usermod -aG docker "$USER"; fi
+  warn "Docker-published ports bypass UFW rules. Restrict them with firewall rules in the DOCKER-USER chain."
+}
+
+remove_conflicting_docker_packages() {
+  local package
+  local -a installed_conflicts=()
+  local -a conflicts=(docker.io docker-compose docker-doc podman-docker containerd runc)
+
+  for package in "${conflicts[@]}"; do
+    if dpkg-query -W -f='${db:Status-Abbrev}' "$package" 2>/dev/null | grep -q '^ii '; then
+      installed_conflicts+=("$package")
+    fi
+  done
+
+  if [[ "${#installed_conflicts[@]}" -gt 0 ]]; then
+    log "Removing packages that conflict with Docker CE: ${installed_conflicts[*]}"
+    run sudo apt-get remove -y "${installed_conflicts[@]}"
+  fi
 }

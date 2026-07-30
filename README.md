@@ -9,12 +9,14 @@ The installer detects the distribution and release codename automatically from `
 - Ubuntu Server 24.04 LTS or newer
 - Debian 12 (Bookworm)
 - Debian 13 (Trixie)
+- amd64 or arm64 architecture
 
-Run it as a normal sudo-enabled user, not as root.
+Run it as a normal sudo-enabled user, not as root. Minimal Debian installations
+must have `sudo` installed and configured before running the bootstrap command.
 
 ## Installs
 
-Docker Engine and Compose, Tailscale, OpenSSH, the official Omadots shell configuration used by Omaterm, Omaterm-compatible tmux hotkeys, LazyVim, Starship, fzf, ripgrep, fd, zoxide, mise, GitHub CLI, lazygit, lazydocker, Codex, Claude Code, Gemini CLI, and OpenCode.
+Docker Engine and Compose, Tailscale, OpenSSH, the official Omadots shell configuration used by Omaterm, Omaterm-compatible tmux hotkeys, LazyVim, Starship, fzf, ripgrep, fd, bat, zoxide, mise, GitHub CLI, lazygit, lazydocker, Codex, Claude Code, Gemini CLI, and OpenCode.
 
 ## Safe installation
 
@@ -76,6 +78,9 @@ Install the operating system, Docker, databases, and active projects on the SSD.
 ## Security
 
 The installer never stores tokens or API keys. Existing managed configuration files are backed up before replacement. It does not modify SSH authentication policy or open public firewall ports.
+
+Docker-published container ports bypass UFW rules. Restrict published ports
+with rules in Docker's `DOCKER-USER` chain; do not rely on UFW alone for them.
 
 ## Omaterm compatibility
 

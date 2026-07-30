@@ -49,6 +49,7 @@ detect_supported_os() {
 
   OS_VERSION_ID="${VERSION_ID:-unknown}"
   OS_PRETTY_NAME="${PRETTY_NAME:-$OS_ID $OS_VERSION_ID}"
+  OS_ARCHITECTURE="${OS_ARCHITECTURE:-$(dpkg --print-architecture)}"
 
   local major_version="${OS_VERSION_ID%%.*}"
   if [[ "$major_version" =~ ^[0-9]+$ ]]; then
@@ -62,7 +63,15 @@ detect_supported_os() {
     fi
   fi
 
-  export OS_ID OS_CODENAME OS_VERSION_ID OS_PRETTY_NAME
+  case "$OS_ARCHITECTURE" in
+    amd64|arm64) ;;
+    *)
+      echo "Supported architectures are amd64 and arm64. Detected: $OS_ARCHITECTURE" >&2
+      return 1
+      ;;
+  esac
+
+  export OS_ID OS_CODENAME OS_VERSION_ID OS_PRETTY_NAME OS_ARCHITECTURE
 }
 
 require_supported_os() {

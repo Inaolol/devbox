@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 install_terminal() {
   log "Installing terminal and development tools"
-  install_apt_packages tmux ripgrep fd-find fzf bash-completion
+  install_apt_packages tmux ripgrep fd-find fzf bash-completion bat
 
   mkdir -p "$HOME/.local/bin"
   install_neovim
 
   if [[ ! -e "$HOME/.local/bin/fd" ]] && command -v fdfind >/dev/null 2>&1; then
     run ln -s "$(command -v fdfind)" "$HOME/.local/bin/fd"
+  fi
+  if [[ ! -e "$HOME/.local/bin/bat" ]] && command -v batcat >/dev/null 2>&1; then
+    run ln -s "$(command -v batcat)" "$HOME/.local/bin/bat"
   fi
 
   if ! command -v starship >/dev/null 2>&1; then
@@ -32,7 +35,7 @@ install_neovim() {
   local current_version=""
   if command -v nvim >/dev/null 2>&1; then
     current_version="$(nvim --version | head -n1 | awk '{print $2}' | sed 's/^v//')"
-    if printf '%s\n%s\n' "0.10.0" "$current_version" | sort -V -C; then
+    if printf '%s\n%s\n' "0.11.2" "$current_version" | sort -V -C; then
       return
     fi
   fi
@@ -83,7 +86,7 @@ install_lazygit() {
   version="$(latest_github_release_tag jesseduffield/lazygit)"; version="${version#v}"
   arch="$(dpkg --print-architecture)"; [[ "$arch" == amd64 ]] && arch=x86_64
   tmp="$(mktemp -d)"
-  curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${version}/lazygit_${version}_Linux_${arch}.tar.gz" | tar -xz -C "$tmp" lazygit
+  curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${version}/lazygit_${version}_linux_${arch}.tar.gz" | tar -xz -C "$tmp" lazygit
   install -m 0755 "$tmp/lazygit" "$HOME/.local/bin/lazygit"
   rm -rf "$tmp"
 }

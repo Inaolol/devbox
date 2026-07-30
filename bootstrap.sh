@@ -6,6 +6,10 @@ REF="${DEVBOX_REF:-master}"
 TARGET="${DEVBOX_DIR:-$HOME/.local/share/devbox}"
 
 command -v git >/dev/null 2>&1 || {
+  command -v sudo >/dev/null 2>&1 || {
+    echo "Git and sudo are required. Install sudo and grant this user sudo access, then rerun." >&2
+    exit 1
+  }
   sudo apt-get update
   sudo apt-get install -y git
 }

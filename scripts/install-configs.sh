@@ -44,11 +44,19 @@ install_omadots() {
   install -m 0644 "$REPO_ROOT/configs/tmux.conf" "$HOME/.config/tmux/tmux.conf"
   ln -snf "$HOME/.config/tmux/tmux.conf" "$HOME/.tmux.conf"
 
+  backup_path "$HOME/.bashrc"
+  backup_path "$HOME/.bash_profile"
+  backup_path "$HOME/.inputrc"
+
   cat > "$HOME/.bashrc" <<'BASHRC'
 # If not running interactively, do nothing.
 [[ $- != *i* ]] && return
 
 source ~/.config/shell/all
+
+# Debian and Ubuntu package fzf's shell integration as documentation examples.
+[[ -f /usr/share/doc/fzf/examples/completion.bash ]] && source /usr/share/doc/fzf/examples/completion.bash
+[[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
 
 # DevBox additions
 export PATH="$HOME/.local/bin:$PATH"

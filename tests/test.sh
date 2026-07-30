@@ -15,15 +15,23 @@ fi
 grep -q 'set -Eeuo pipefail' "$ROOT/install.sh"
 grep -q 'require_supported_os' "$ROOT/install.sh"
 grep -q 'docker-ce' "$ROOT/scripts/install-docker.sh"
+grep -q 'podman-docker' "$ROOT/scripts/install-docker.sh"
+grep -q 'DOCKER-USER' "$ROOT/scripts/install-docker.sh"
 # The literal placeholder must appear in the installer.
 # shellcheck disable=SC2016
 grep -q 'download.docker.com/linux/${OS_ID}' "$ROOT/scripts/install-docker.sh"
 grep -q 'nvim-linux-x86_64.tar.gz' "$ROOT/scripts/install-terminal.sh"
-grep -q '0.10.0' "$ROOT/scripts/install-terminal.sh"
+grep -q '0.11.2' "$ROOT/scripts/install-terminal.sh"
+grep -q 'bash-completion bat' "$ROOT/scripts/install-terminal.sh"
+grep -q 'command -v batcat' "$ROOT/scripts/install-terminal.sh"
+# The literal release URL placeholders must appear in the installer.
+# shellcheck disable=SC2016
+grep -q 'lazygit_${version}_linux_${arch}.tar.gz' "$ROOT/scripts/install-terminal.sh"
 grep -q 'No API keys are stored' "$ROOT/scripts/install-ai.sh"
 grep -q 'set -g prefix C-Space' "$ROOT/configs/tmux.conf"
 grep -q 'prefix2 C-b' "$ROOT/configs/tmux.conf"
 grep -q 'omacom-io/omadots' "$ROOT/scripts/install-configs.sh"
+grep -q 'backup_path "$HOME/.bashrc"' "$ROOT/scripts/install-configs.sh"
 
 # Test OS detection independently of the host running the test.
 # ROOT is computed at runtime, so ShellCheck cannot resolve this source path.
@@ -31,6 +39,7 @@ grep -q 'omacom-io/omadots' "$ROOT/scripts/install-configs.sh"
 source "$ROOT/scripts/lib.sh"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+OS_ARCHITECTURE=amd64
 
 cat > "$tmp/ubuntu" <<'OS'
 ID=ubuntu
@@ -59,6 +68,13 @@ PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
 OS
 OS_RELEASE_FILE="$tmp/debian13" detect_supported_os
 [[ "$OS_ID" == debian && "$OS_CODENAME" == trixie ]]
+
+OS_ARCHITECTURE=i386
+if OS_RELEASE_FILE="$tmp/debian13" detect_supported_os 2>/dev/null; then
+  echo "Unsupported architecture test failed" >&2
+  exit 1
+fi
+OS_ARCHITECTURE=amd64
 
 cat > "$tmp/old-debian" <<'OS'
 ID=debian
