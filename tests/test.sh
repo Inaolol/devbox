@@ -55,7 +55,9 @@ grep -q 'omacom-io/omadots' "$ROOT/scripts/install-configs.sh"
 # The literal HOME expression must appear in the installer.
 # shellcheck disable=SC2016
 grep -q 'backup_path "$HOME/.bashrc"' "$ROOT/scripts/install-configs.sh"
+# shellcheck disable=SC2016
 grep -q 'git config --file "$HOME/.gitconfig" user.name' "$ROOT/scripts/install-configs.sh"
+# shellcheck disable=SC2016
 grep -q 'git config --file "$HOME/.gitconfig" user.email' "$ROOT/scripts/install-configs.sh"
 grep -q 'tmux-free' "$ROOT/scripts/install-configs.sh"
 grep -q 'Git identity is already configured' "$ROOT/scripts/devbox-setup"
