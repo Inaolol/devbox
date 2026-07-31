@@ -11,13 +11,12 @@ install_ai() {
     return
   fi
 
-  # Keep this list aligned with omacom-io/omaterm/mise.packages. Using mise
-  # registry names also lets mise select each tool's supported release artifact
-  # instead of coupling all agents to npm.
+  # Follow Omaterm's general-purpose tool set while leaving out
+  # Basecamp/37signals-specific product tooling. Using mise registry names also
+  # lets mise select each tool's supported release artifact.
   run "$mise_bin" use --global --yes \
     node pi opencode claude-code codex gemini \
-    aqua:modem-dev/hunk \
-    github:basecamp/basecamp-cli
+    aqua:modem-dev/hunk
 
   warn "Authenticate each AI tool separately. No API keys are stored by this repository."
 }

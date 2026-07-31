@@ -34,8 +34,11 @@ grep -q 'kitty-terminfo' "$ROOT/scripts/install-terminal.sh"
 # The literal release URL placeholders must appear in the installer.
 # shellcheck disable=SC2016
 grep -q 'lazygit_${version}_linux_${arch}.tar.gz' "$ROOT/scripts/install-terminal.sh"
-grep -q 'github:basecamp/basecamp-cli' "$ROOT/scripts/install-ai.sh"
 grep -q 'aqua:modem-dev/hunk' "$ROOT/scripts/install-ai.sh"
+if grep -q 'github:basecamp/basecamp-cli' "$ROOT/scripts/install-ai.sh"; then
+  echo "Product-specific Basecamp CLI should not be installed" >&2
+  exit 1
+fi
 grep -q 'No API keys are stored' "$ROOT/scripts/install-ai.sh"
 grep -q 'set -g prefix C-Space' "$ROOT/configs/tmux.conf"
 grep -q 'prefix2 C-b' "$ROOT/configs/tmux.conf"

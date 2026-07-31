@@ -7,11 +7,11 @@ An Omakase terminal setup for Debian and Ubuntu. Think of it as a host-native [O
 - **Shell**: Bash with the official [Omadots](https://github.com/omacom-io/omadots), Starship, fzf, eza, zoxide, bat, and tmux
 - **Editors**: Neovim with LazyVim, plus Vim for plain TTY sessions
 - **Agents**: OpenCode, Claude Code, Codex, Gemini, and Pi
-- **Dev tools**: mise, Node, Docker, Compose, buildx, GitHub CLI (`gh`), lazygit, lazydocker, Hunk, and Basecamp CLI
+- **Dev tools**: mise, Node, Docker, Compose, buildx, GitHub CLI (`gh`), lazygit, lazydocker, and Hunk
 - **Networking**: OpenSSH and Tailscale
 - **Git**: Optional setup for user name/email and GitHub authentication
 
-System packages are installed through Debian or Ubuntu repositories wherever possible. Current release binaries are used where the distribution packages do not match Omaterm's requirements. The development and AI tools follow Omaterm's current `mise.packages` manifest.
+System packages are installed through Debian or Ubuntu repositories wherever possible. Current release binaries are used where the distribution packages do not match Omaterm's requirements. The development and AI tools follow Omaterm's general-purpose tool set while leaving out Basecamp/37signals-specific product tooling.
 
 ## Install
 
