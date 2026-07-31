@@ -50,6 +50,10 @@ grep -q 'DEVBOX_NO_TMUX' "$ROOT/scripts/install-configs.sh"
 grep -q "alias lzd='lazydocker'" "$ROOT/configs/shell/devbox-server"
 grep -q 'disable-password-auth' "$ROOT/scripts/devbox-setup"
 grep -q 'sshd -t' "$ROOT/scripts/devbox-setup"
+grep -q 'not Tailscale SSH' "$ROOT/scripts/devbox-setup"
+grep -q -- '--with-adguard' "$ROOT/install.sh"
+grep -q 'adguard/adguardhome' "$ROOT/scripts/install-adguard.sh"
+grep -q '53:53' "$ROOT/scripts/install-adguard.sh"
 
 # Test OS detection independently of the host running the test.
 # ROOT is computed at runtime, so ShellCheck cannot resolve this source path.

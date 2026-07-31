@@ -5,6 +5,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ONLY=""
 WITHOUT_AI=0
 WITHOUT_TAILSCALE=0
+WITH_ADGUARD=0
 DRY_RUN=0
 
 usage() {
@@ -12,9 +13,10 @@ usage() {
 Usage: ./install.sh [options]
 
 Options:
-  --only COMPONENT       Install one component: base, docker, tailscale, terminal, ai, configs, services
+  --only COMPONENT       Install one component: base, docker, tailscale, terminal, ai, configs, services, adguard
   --without-ai           Skip AI command line tools
   --without-tailscale    Skip Tailscale
+  --with-adguard         Install AdGuard Home ad blocker (opt-in)
   --dry-run              Print commands without executing them
   -h, --help             Show help
 USAGE
@@ -25,6 +27,7 @@ while [[ $# -gt 0 ]]; do
     --only) ONLY="${2:-}"; shift 2 ;;
     --without-ai) WITHOUT_AI=1; shift ;;
     --without-tailscale) WITHOUT_TAILSCALE=1; shift ;;
+    --with-adguard) WITH_ADGUARD=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage; exit 2 ;;
@@ -51,6 +54,7 @@ source "$REPO_ROOT/scripts/install-terminal.sh"
 source "$REPO_ROOT/scripts/install-ai.sh"
 source "$REPO_ROOT/scripts/install-configs.sh"
 source "$REPO_ROOT/scripts/install-services.sh"
+source "$REPO_ROOT/scripts/install-adguard.sh"
 
 run_component base install_base
 run_component docker install_docker
@@ -59,5 +63,9 @@ run_component terminal install_terminal
 if [[ "$WITHOUT_AI" -eq 0 ]]; then run_component ai install_ai; fi
 run_component configs install_configs
 run_component services install_services
+
+if [[ "$WITH_ADGUARD" -eq 1 || "$ONLY" == "adguard" ]]; then
+  run_component adguard install_adguard
+fi
 
 log "Installation complete. Sign out and back in if Docker group access was added."

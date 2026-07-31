@@ -10,9 +10,11 @@ Usage:
   devbox-setup tailscale [--hostname NAME] [--auth-key KEY]
   devbox-setup ssh --key PUBLIC_KEY [--disable-password-auth]
 
-The SSH command adds a validated public key. Password authentication is changed
-only when --disable-password-auth is explicitly supplied and a valid key is
-already present in ~/.ssh/authorized_keys.
+The SSH command adds a validated public key for regular OpenSSH logins (ssh
+user@host). Tailscale SSH does not need a key; it trusts your tailnet identity.
+Password authentication is changed only when --disable-password-auth is
+explicitly supplied and a valid key is already present in
+~/.ssh/authorized_keys.
 USAGE
 }
 
@@ -185,7 +187,7 @@ setup_ssh() {
   done
 
   need ssh-keygen
-  key="${key:-$(prompt 'SSH public key: ')}"
+  key="${key:-$(prompt 'SSH public key (for regular OpenSSH logins, not Tailscale SSH): ')}"
   [[ -n "$key" ]] || die "an SSH public key is required"
   validate_public_key "$key" || die "invalid SSH public key"
 
@@ -210,7 +212,7 @@ interactive_setup() {
   if command -v tailscale >/dev/null 2>&1 && confirm "Connect Tailscale and enable Tailscale SSH?"; then
     setup_tailscale
   fi
-  if confirm "Add an SSH public key for remote access?"; then
+  if confirm "Add an SSH public key for regular OpenSSH logins (not Tailscale SSH)?"; then
     setup_ssh
   fi
   echo

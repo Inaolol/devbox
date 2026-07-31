@@ -10,6 +10,7 @@ An Omakase terminal setup for Debian and Ubuntu. Think of it as a host-native [O
 - **Dev tools**: mise, Node, Docker, Compose, buildx, GitHub CLI (`gh`), lazygit, lazydocker, and Hunk
 - **Networking**: OpenSSH and Tailscale
 - **Git**: Optional setup for user name/email and GitHub authentication
+- **Ad blocking (opt-in)**: AdGuard Home via Docker Compose
 
 System packages are installed through Debian or Ubuntu repositories wherever possible. Current release binaries are used where the distribution packages do not match Omaterm's requirements. The development and AI tools follow Omaterm's general-purpose tool set while leaving out Basecamp/37signals-specific product tooling.
 
@@ -74,6 +75,7 @@ Available options:
 ```text
 --without-ai
 --without-tailscale
+--with-adguard
 --only base
 --only docker
 --only tailscale
@@ -81,7 +83,27 @@ Available options:
 --only ai
 --only configs
 --only services
+--only adguard
 --dry-run
+```
+
+AdGuard Home is opt-in so a DevBox install stays a plain devbox unless asked
+for it. `--with-adguard` deploys it during a full install, and `--only adguard`
+installs just the ad blocker on an existing box:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh |
+  bash -s -- --with-adguard
+```
+
+It runs as a Docker Compose service in `~/adguard/docker-compose.yml` (ports
+53 for DNS and 80/3000 for the web admin). After install, finish the first-run
+setup at `http://<host>:3000`, then point your router or devices at the host's
+IP to block ads network-wide. Manage it with:
+
+```bash
+docker compose --project-name devbox-adguard -f ~/adguard/docker-compose.yml up -d
+docker compose --project-name devbox-adguard -f ~/adguard/docker-compose.yml logs -f
 ```
 
 Set `DEVBOX_NO_TMUX=1` before starting Bash to skip automatic tmux attachment:
