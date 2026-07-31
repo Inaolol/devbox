@@ -7,6 +7,8 @@ WITHOUT_AI=0
 WITHOUT_TAILSCALE=0
 WITH_ADGUARD=0
 DRY_RUN=0
+STATE_DIR="$HOME/.local/state/devbox"
+INSTALL_MARKER="$STATE_DIR/installed"
 
 usage() {
   cat <<'USAGE'
@@ -34,7 +36,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-export REPO_ROOT DRY_RUN
+if [[ -f "$INSTALL_MARKER" || -e "$HOME/.config/shell/devbox-server" ]]; then
+  DEVBOX_UPDATE=1
+else
+  DEVBOX_UPDATE=0
+fi
+
+export REPO_ROOT DRY_RUN DEVBOX_UPDATE
 source "$REPO_ROOT/scripts/lib.sh"
 require_supported_os
 require_non_root
@@ -55,17 +63,31 @@ source "$REPO_ROOT/scripts/install-ai.sh"
 source "$REPO_ROOT/scripts/install-configs.sh"
 source "$REPO_ROOT/scripts/install-services.sh"
 source "$REPO_ROOT/scripts/install-adguard.sh"
+source "$REPO_ROOT/scripts/migrations.sh"
+
+if [[ "$DEVBOX_UPDATE" -eq 1 && -z "$ONLY" ]]; then
+  run_migrations
+fi
 
 run_component base install_base
 run_component docker install_docker
 if [[ "$WITHOUT_TAILSCALE" -eq 0 ]]; then run_component tailscale install_tailscale; fi
 run_component terminal install_terminal
 if [[ "$WITHOUT_AI" -eq 0 ]]; then run_component ai install_ai; fi
-run_component configs install_configs
+if [[ "$DEVBOX_UPDATE" -eq 0 || -n "$ONLY" ]]; then
+  run_component configs install_configs
+else
+  log "Keeping existing user configuration during update"
+fi
 run_component services install_services
 
 if [[ "$WITH_ADGUARD" -eq 1 || "$ONLY" == "adguard" ]]; then
   run_component adguard install_adguard
+fi
+
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  mkdir -p "$STATE_DIR"
+  touch "$INSTALL_MARKER"
 fi
 
 log "Installation complete. Sign out and back in if Docker group access was added."

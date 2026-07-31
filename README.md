@@ -121,13 +121,19 @@ DEVBOX_NO_TMUX=1 bash
 
 ## Updating
 
-Run the installer again. The bootstrap fetches the current `master` branch and reapplies the setup:
+Run the installer again. The bootstrap fetches the current `master` branch and
+updates installed packages and DevBox-managed programs:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh | bash
 ```
 
-Existing managed configuration is moved to timestamped backups before replacement.
+Updates preserve existing shell/editor configuration and onboarding state such
+as Git identity, GitHub authentication, Tailscale enrollment, and SSH keys.
+Configuration is installed only on first setup; an explicit `--only configs`
+run replaces managed configuration and creates timestamped backups. DevBox
+records one-time update migrations under `~/.local/state/devbox/migrations`, so
+new releases can change only the files or settings that actually need changing.
 
 ## Omaterm compatibility
 

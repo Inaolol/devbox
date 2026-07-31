@@ -13,8 +13,9 @@ install_services() {
     return
   fi
 
-  # Optional unattended setup follows Omaterm's environment-driven pattern.
-  if [[ -n "${DEVBOX_SETUP_GIT_NAME:-}" || -n "${DEVBOX_SETUP_GIT_EMAIL:-}" ]]; then
+  # Onboarding is first-install work. Updates refresh this helper without
+  # replaying credentials or changing service enrollment.
+  if [[ "${DEVBOX_UPDATE:-0}" -eq 0 && ( -n "${DEVBOX_SETUP_GIT_NAME:-}" || -n "${DEVBOX_SETUP_GIT_EMAIL:-}" ) ]]; then
     if [[ -n "${DEVBOX_SETUP_GIT_NAME:-}" && -n "${DEVBOX_SETUP_GIT_EMAIL:-}" ]]; then
       "$target_dir/devbox-setup" git \
         --name "$DEVBOX_SETUP_GIT_NAME" --email "$DEVBOX_SETUP_GIT_EMAIL"
@@ -23,18 +24,18 @@ install_services() {
     fi
   fi
 
-  if [[ -n "${DEVBOX_SETUP_GH_TOKEN:-}" ]]; then
+  if [[ "${DEVBOX_UPDATE:-0}" -eq 0 && -n "${DEVBOX_SETUP_GH_TOKEN:-}" ]]; then
     printf '%s' "$DEVBOX_SETUP_GH_TOKEN" |
       "$target_dir/devbox-setup" github --with-token
   fi
 
-  if [[ -n "${DEVBOX_SETUP_TS_AUTH_KEY:-}" ]]; then
+  if [[ "${DEVBOX_UPDATE:-0}" -eq 0 && -n "${DEVBOX_SETUP_TS_AUTH_KEY:-}" ]]; then
     "$target_dir/devbox-setup" tailscale \
       --hostname "${DEVBOX_SETUP_TS_HOST:-$(hostname -s)}" \
       --auth-key "$DEVBOX_SETUP_TS_AUTH_KEY"
   fi
 
-  if [[ -n "${DEVBOX_SETUP_SSH_KEY:-}" ]]; then
+  if [[ "${DEVBOX_UPDATE:-0}" -eq 0 && -n "${DEVBOX_SETUP_SSH_KEY:-}" ]]; then
     "$target_dir/devbox-setup" ssh --key "$DEVBOX_SETUP_SSH_KEY"
   fi
 

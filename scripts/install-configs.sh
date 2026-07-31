@@ -5,7 +5,7 @@ install_configs() {
 }
 
 install_omadots() {
-  local temp_dir
+  local temp_dir git_name git_email
 
   if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
     echo "+ clone https://github.com/omacom-io/omadots.git and install its authoritative shell, tmux, and LazyVim configs"
@@ -17,6 +17,11 @@ install_omadots() {
   temp_dir="$(mktemp -d)"
   trap 'rm -rf "$temp_dir"' RETURN
   git clone --depth 1 https://github.com/omacom-io/omadots.git "$temp_dir/omadots"
+
+  # Git may store global identity in ~/.config/git/config, which Omadots
+  # replaces below. Keep the machine-specific identity across updates.
+  git_name="$(git config --global --get user.name 2>/dev/null || true)"
+  git_email="$(git config --global --get user.email 2>/dev/null || true)"
 
   if [[ -e "$HOME/.config/nvim" ]]; then
     backup_path "$HOME/.config/nvim"
@@ -63,6 +68,13 @@ source ~/.config/shell/devbox-server
 BASHRC
   echo '. ~/.bashrc' > "$HOME/.bash_profile"
   ln -snf "$HOME/.config/shell/inputrc" "$HOME/.inputrc"
+
+  if [[ -n "$git_name" ]]; then
+    git config --file "$HOME/.gitconfig" user.name "$git_name"
+  fi
+  if [[ -n "$git_email" ]]; then
+    git config --file "$HOME/.gitconfig" user.email "$git_email"
+  fi
 
   rm -rf "$temp_dir"
   trap - RETURN

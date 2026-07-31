@@ -207,12 +207,24 @@ setup_ssh() {
 interactive_setup() {
   echo "Devbox service onboarding (inspired by Omaterm)"
   echo
-  if confirm "Configure Git identity?"; then setup_git; fi
-  if confirm "Authenticate with GitHub?"; then setup_github; fi
-  if command -v tailscale >/dev/null 2>&1 && confirm "Connect Tailscale and enable Tailscale SSH?"; then
+  if [[ -n "$(git config --global --get user.name 2>/dev/null || true)" && -n "$(git config --global --get user.email 2>/dev/null || true)" ]]; then
+    echo "✓ Git identity is already configured"
+  elif confirm "Configure Git identity?"; then
+    setup_git
+  fi
+  if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
+    echo "✓ GitHub is already authenticated"
+  elif confirm "Authenticate with GitHub?"; then
+    setup_github
+  fi
+  if command -v tailscale >/dev/null 2>&1 && tailscale ip -4 >/dev/null 2>&1; then
+    echo "✓ Tailscale is already connected"
+  elif command -v tailscale >/dev/null 2>&1 && confirm "Connect Tailscale and enable Tailscale SSH?"; then
     setup_tailscale
   fi
-  if confirm "Add an SSH public key for regular OpenSSH logins (not Tailscale SSH)?"; then
+  if authorized_keys_has_valid_key; then
+    echo "✓ An SSH public key is already installed"
+  elif confirm "Add an SSH public key for regular OpenSSH logins (not Tailscale SSH)?"; then
     setup_ssh
   fi
   echo
