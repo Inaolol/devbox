@@ -205,7 +205,7 @@ setup_ssh() {
 }
 
 interactive_setup() {
-  echo "Devbox service onboarding (inspired by Omaterm)"
+  echo "Devbox service onboarding"
   echo
   if [[ -n "$(git config --global --get user.name 2>/dev/null || true)" && -n "$(git config --global --get user.email 2>/dev/null || true)" ]]; then
     echo "✓ Git identity is already configured"
