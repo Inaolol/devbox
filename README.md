@@ -163,6 +163,10 @@ cx   open Claude Code
 
 The installer does not store API keys or tokens. Unattended setup values are read only when explicitly supplied through `DEVBOX_SETUP_*` environment variables.
 
+DevBox creates empty skill roots at `~/.agents/skills`, `~/.claude/skills`,
+`~/.codex/skills`, and `~/.pi/agent/skills`. It does not install skills into
+them, and updates preserve anything the user adds there.
+
 Docker-published container ports bypass UFW rules. Restrict them through Docker's `DOCKER-USER` chain rather than relying on UFW alone.
 
 DevBox is inspired by [Omarchy](https://github.com/basecamp/omarchy) and

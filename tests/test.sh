@@ -60,6 +60,29 @@ if grep -q 'github:basecamp/basecamp-cli' "$ROOT/scripts/install-ai.sh"; then
   exit 1
 fi
 grep -q 'No API keys are stored' "$ROOT/scripts/install-ai.sh"
+# These literal HOME paths must remain user-owned skill roots.
+# shellcheck disable=SC2016
+grep -q '"$HOME/.agents/skills"' "$ROOT/scripts/install-ai.sh"
+# shellcheck disable=SC2016
+grep -q '"$HOME/.claude/skills"' "$ROOT/scripts/install-ai.sh"
+# shellcheck disable=SC2016
+grep -q '"$HOME/.codex/skills"' "$ROOT/scripts/install-ai.sh"
+# shellcheck disable=SC2016
+grep -q '"$HOME/.pi/agent/skills"' "$ROOT/scripts/install-ai.sh"
+(
+  HOME="$(mktemp -d)"
+  log() { :; }
+  run() { "$@"; }
+  source "$ROOT/scripts/install-ai.sh"
+  install_agent_skill_directories
+  touch "$HOME/.agents/skills/user-skill"
+  install_agent_skill_directories
+  test -d "$HOME/.claude/skills"
+  test -d "$HOME/.codex/skills"
+  test -d "$HOME/.pi/agent/skills"
+  test -e "$HOME/.agents/skills/user-skill"
+  rm -rf "$HOME"
+)
 grep -q 'set -g prefix C-Space' "$ROOT/configs/tmux.conf"
 grep -q 'prefix2 C-b' "$ROOT/configs/tmux.conf"
 grep -q 'omacom-io/omadots' "$ROOT/scripts/install-configs.sh"
