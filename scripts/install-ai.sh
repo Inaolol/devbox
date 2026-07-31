@@ -15,7 +15,7 @@ install_ai() {
   # Basecamp/37signals-specific product tooling. Using mise registry names also
   # lets mise select each tool's supported release artifact.
   run "$mise_bin" use --global --yes \
-    node pi opencode claude-code codex gemini \
+    node pi opencode claude-code codex antigravity-cli \
     aqua:modem-dev/hunk
 
   warn "Authenticate each AI tool separately. No API keys are stored by this repository."

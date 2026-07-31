@@ -35,6 +35,11 @@ grep -q 'kitty-terminfo' "$ROOT/scripts/install-terminal.sh"
 # shellcheck disable=SC2016
 grep -q 'lazygit_${version}_linux_${arch}.tar.gz' "$ROOT/scripts/install-terminal.sh"
 grep -q 'aqua:modem-dev/hunk' "$ROOT/scripts/install-ai.sh"
+grep -q 'antigravity-cli' "$ROOT/scripts/install-ai.sh"
+if grep -q 'gemini' "$ROOT/scripts/install-ai.sh"; then
+  echo "Deprecated Gemini CLI should not be installed; Antigravity CLI replaces it" >&2
+  exit 1
+fi
 if grep -q 'github:basecamp/basecamp-cli' "$ROOT/scripts/install-ai.sh"; then
   echo "Product-specific Basecamp CLI should not be installed" >&2
   exit 1
@@ -46,7 +51,7 @@ grep -q 'omacom-io/omadots' "$ROOT/scripts/install-configs.sh"
 # The literal HOME expression must appear in the installer.
 # shellcheck disable=SC2016
 grep -q 'backup_path "$HOME/.bashrc"' "$ROOT/scripts/install-configs.sh"
-grep -q 'DEVBOX_NO_TMUX' "$ROOT/scripts/install-configs.sh"
+grep -q 'tmux-free' "$ROOT/scripts/install-configs.sh"
 grep -q "alias lzd='lazydocker'" "$ROOT/configs/shell/devbox-server"
 grep -q 'disable-password-auth' "$ROOT/scripts/devbox-setup"
 grep -q 'sshd -t' "$ROOT/scripts/devbox-setup"

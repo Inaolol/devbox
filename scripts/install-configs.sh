@@ -58,13 +58,8 @@ source ~/.config/shell/devbox-server
 [[ -f /usr/share/doc/fzf/examples/completion.bash ]] && source /usr/share/doc/fzf/examples/completion.bash
 [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
 
-# Omaterm starts tmux for terminal connections. These checks keep SSH commands,
-# scp/sftp, cron, and nested tmux shells unaffected. Set DEVBOX_NO_TMUX=1 to opt out.
-if [[ -z ${TMUX:-} && -z ${DEVBOX_NO_TMUX:-} &&
-      ${TERM:-dumb} != dumb && -t 0 && -t 1 ]] &&
-   command -v tmux >/dev/null 2>&1; then
-  tmux attach 2>/dev/null || tmux new-session -s Work
-fi
+# DevBox leaves the shell tmux-free. Start tmux yourself with the
+# Omadots alias: t   (attach to Work or create it). Inside tmux, use tdl <ai>.
 BASHRC
   echo '. ~/.bashrc' > "$HOME/.bash_profile"
   ln -snf "$HOME/.config/shell/inputrc" "$HOME/.inputrc"

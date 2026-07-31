@@ -1,12 +1,16 @@
 # DevBox
 
-An Omakase terminal setup for Debian and Ubuntu. Think of it as a host-native [Omaterm](https://learn.omacom.io/4/the-omaterm-manual), bringing the familiar headless [Omarchy](https://github.com/basecamp/omarchy) experience to machines that are not running Arch.
+A terminal setup for your headless servers — a home box or a cloud VPS. It
+installs the shell, editors, dev tools, and networking (Tailscale, SSH) you need
+to get productive from the minute you log in, so you don't have to set up a
+fresh Debian or Ubuntu server by hand.
+
 
 ## What it sets up
 
-- **Shell**: Bash with the official [Omadots](https://github.com/omacom-io/omadots), Starship, fzf, eza, zoxide, bat, and tmux
+- **Shell**: Bash with [Omadots](https://github.com/omacom-io/omadots), Starship, fzf, eza, zoxide, bat, and tmux
 - **Editors**: Neovim with LazyVim, plus Vim for plain TTY sessions
-- **Agents**: OpenCode, Claude Code, Codex, Gemini, and Pi
+- **Agents**: OpenCode, Claude Code, Codex, Antigravity CLI, and Pi
 - **Dev tools**: mise, Node, Docker, Compose, buildx, GitHub CLI (`gh`), lazygit, lazydocker, and Hunk
 - **Networking**: OpenSSH and Tailscale
 - **Git**: Optional setup for user name/email and GitHub authentication
@@ -32,7 +36,9 @@ This supports:
 Minimal Debian installations must have `curl` and `sudo` installed first, with
 the user configured for sudo access.
 
-Open a new login session after installation. DevBox will attach interactive terminals to the shared `Work` tmux session, just like Omaterm.
+Open a new login session after installation. DevBox leaves the
+shell tmux-free; start tmux yourself with `t` (attaches to or creates the
+shared `Work` session), then use `tdl <ai>` for the dev layout.
 
 ## Setup
 
@@ -106,7 +112,8 @@ docker compose --project-name devbox-adguard -f ~/adguard/docker-compose.yml up 
 docker compose --project-name devbox-adguard -f ~/adguard/docker-compose.yml logs -f
 ```
 
-Set `DEVBOX_NO_TMUX=1` before starting Bash to skip automatic tmux attachment:
+Set `DEVBOX_NO_TMUX=1` before starting Bash to skip the auto-attach on hosts
+that were set up before this change (or where you re-enable it):
 
 ```bash
 DEVBOX_NO_TMUX=1 bash
@@ -130,7 +137,7 @@ DevBox follows the same setup order as Omaterm:
 2. Install the official Omadots configuration.
 3. Install Omaterm's mise-managed tools.
 4. Configure Git, GitHub, Tailscale, and SSH.
-5. Enter tmux for interactive terminal work.
+5. Start tmux interactively with `t` (or `tdl`) when wanted.
 
 The checked-in tmux configuration mirrors current Omadots. Installation uses fresh upstream Omadots as the authoritative source.
 
@@ -151,3 +158,7 @@ cx   open Claude Code
 The installer does not store API keys or tokens. Unattended setup values are read only when explicitly supplied through `DEVBOX_SETUP_*` environment variables.
 
 Docker-published container ports bypass UFW rules. Restrict them through Docker's `DOCKER-USER` chain rather than relying on UFW alone.
+
+DevBox is inspired by [Omarchy](https://github.com/basecamp/omarchy) and
+[Omaterm](https://learn.omacom.io/4/the-omaterm-manual); see their GitHub
+readmes for attribution and the workflows this project builds on.
