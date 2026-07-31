@@ -1,4 +1,5 @@
 # Native Debian/Ubuntu additions to the upstream Omadots shell configuration.
+export LANG="${LANG:-C.UTF-8}"
 export PATH="$HOME/.local/bin:$PATH"
 
 # Omaterm manual aliases that are not currently defined by Omadots.

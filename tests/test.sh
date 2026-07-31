@@ -99,6 +99,10 @@ grep -q 'GitHub is already authenticated' "$ROOT/scripts/devbox-setup"
 grep -q 'Tailscale is already connected' "$ROOT/scripts/devbox-setup"
 grep -q 'An SSH public key is already installed' "$ROOT/scripts/devbox-setup"
 grep -q "alias lzd='lazydocker'" "$ROOT/configs/shell/devbox-server"
+# The literal fallback must initialize tmux with UTF-8 character handling.
+# shellcheck disable=SC2016
+grep -q 'export LANG="${LANG:-C.UTF-8}"' "$ROOT/configs/shell/devbox-server"
+grep -q 'C.UTF-8' "$ROOT/migrations/20260731-set-utf8-locale.sh"
 grep -q 'disable-password-auth' "$ROOT/scripts/devbox-setup"
 grep -q 'sshd -t' "$ROOT/scripts/devbox-setup"
 grep -q 'not Tailscale SSH' "$ROOT/scripts/devbox-setup"
