@@ -22,6 +22,17 @@ grep -q 'Keeping existing user configuration during update' "$ROOT/install.sh"
 grep -q '.local/state/devbox' "$ROOT/install.sh"
 grep -q 'run_migrations' "$ROOT/install.sh"
 grep -q '.local/state/devbox/migrations' "$ROOT/scripts/migrations.sh"
+
+# An update with no migrations must not abort the installer under set -e.
+(
+  set -e
+  REPO_ROOT="$(mktemp -d)"
+  HOME="$(mktemp -d)"
+  log() { :; }
+  source "$ROOT/scripts/migrations.sh"
+  run_migrations
+  rm -rf "$REPO_ROOT" "$HOME"
+)
 grep -q 'docker-ce' "$ROOT/scripts/install-docker.sh"
 grep -q 'podman-docker' "$ROOT/scripts/install-docker.sh"
 grep -q 'DOCKER-USER' "$ROOT/scripts/install-docker.sh"

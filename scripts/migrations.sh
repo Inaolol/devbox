@@ -6,7 +6,7 @@ run_migrations() {
   local state_dir="$HOME/.local/state/devbox/migrations"
   local -a migrations=()
 
-  [[ -d "$migration_dir" ]] || return
+  [[ -d "$migration_dir" ]] || return 0
   mkdir -p "$state_dir"
 
   shopt -s nullglob
