@@ -132,7 +132,7 @@ list_dbs() {
 choose_install() {
   local choices
   choices="$(printf '%s\n' "MySQL" "PostgreSQL" "MariaDB" "Redis" "MongoDB" "MSSQL" |
-    gum choose --no-limit --height 8 --header "Select development databases (Docker, localhost only)")" || return 1
+    gum choose --no-limit --height 8 --header "Select development databases (Docker, localhost only)")" || return 0
   [[ -n "$choices" ]] || return 0
 
   local db
@@ -160,7 +160,7 @@ choose_remove() {
   fi
 
   choices="$(printf '%s\n' "${installed[@]}" |
-    gum choose --no-limit --height 8 --header "Select databases to remove")" || return 1
+    gum choose --no-limit --height 8 --header "Select databases to remove")" || return 0
   [[ -n "$choices" ]] || return 0
 
   while IFS= read -r db; do

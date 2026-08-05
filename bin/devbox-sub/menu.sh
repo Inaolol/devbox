@@ -7,7 +7,7 @@ Usage:
   devbox                  Open the interactive menu
   devbox setup            Run the interactive onboarding (devbox-setup)
   devbox db [db...]       Install or remove development databases
-  devbox vm <cmd>         Manage the Windows VM (install/launch/stop/status/remove)
+  devbox vm [cmd]         Manage the Windows VM (interactive by default)
   devbox install [app]    Install adguard, tailscale, 1password, or all
   devbox remove [app]     Remove adguard, tailscale, or 1password
   devbox update           Fetch the latest DevBox and update everything
@@ -16,7 +16,7 @@ USAGE
 }
 
 run_sub() {
-  local sub="$1"
+  local sub="$1" rc
   shift
 
   case "$sub" in
@@ -27,12 +27,20 @@ run_sub() {
   esac
 
   [[ "$sub" == "-h" || "$sub" == "--help" ]] && sub="help"
-  "$DEVBOX_PATH/bin/devbox-sub/$sub.sh" "$@"
+  if "$DEVBOX_PATH/bin/devbox-sub/$sub.sh" "$@"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  if ((rc != 0)); then
+    echo "devbox: '$sub' exited with an error (code $rc)" >&2
+  fi
+  return "$rc"
 }
 
 if (($# > 0)); then
   run_sub "$1" "${@:2}"
-  exit 0
+  exit $?
 fi
 
 command -v gum >/dev/null 2>&1 || {
@@ -46,6 +54,7 @@ while :; do
   [[ -n "$choice" ]] || exit 0
   sub="$(printf '%s' "$choice" | tr '[:upper:]' '[:lower:]')"
   [[ "$sub" == "quit" ]] && exit 0
-  run_sub "$sub"
+  run_sub "$sub" || true
+  [[ "$sub" == "help" ]] && exit 0
   echo
 done

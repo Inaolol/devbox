@@ -8,6 +8,7 @@ IMAGE="dockurr/windows"
 usage() {
   cat <<'USAGE'
 Usage:
+  devbox vm                        Interactive session: install, or manage the VM
   devbox vm install [--ram N G] [--cores N] [--disk N G] [--user NAME] [--pass PASS] [--version V]
               Create the Windows VM (interactive unless options are given)
   devbox vm launch [--keep-alive|-k]   Start the VM and print connection details
@@ -33,6 +34,11 @@ USAGE
 die() {
   echo "devbox vm: $*" >&2
   exit 1
+}
+
+cancel() {
+  echo "Cancelled."
+  exit 0
 }
 
 require_compose() {
@@ -67,7 +73,7 @@ gum_choose() {
   if [[ -n "${!env_name:-}" ]]; then
     printf '%s' "${!env_name}"
   else
-    printf '%s\n' "$options" | gum choose --selected="$selected" --header "$header" --height 8
+    printf '%s\n' "$options" | tr ' ' '\n' | gum choose --selected="$selected" --header "$header" --height 8
   fi
 }
 
@@ -103,12 +109,12 @@ install_vm() {
     ((size <= total_ram_gb)) && ram_options="$ram_options $size"
   done
   [[ -n "$ram_options" ]] || die "at least 2GB of RAM is required for the Windows VM"
-  ram=$(gum_choose DEVBOX_VM_RAM "How much RAM for the Windows VM?" "${ram_options##* }" "${ram_options# }")
-  [[ -n "$ram" ]] || die "install cancelled"
+  ram="$(gum_choose DEVBOX_VM_RAM "How much RAM for the Windows VM?" "${ram_options##* }" "${ram_options# }")" || cancel
+  [[ -n "$ram" ]] || cancel
   ram="${ram%G}G"
 
-  cores=$(gum_input DEVBOX_VM_CORES "Number of CPU cores (1-$total_cores)?" "2")
-  [[ -n "$cores" ]] || die "install cancelled"
+  cores="$(gum_input DEVBOX_VM_CORES "Number of CPU cores (1-$total_cores)?" "2")" || cancel
+  [[ -n "$cores" ]] || cores="2"
   if ! [[ "$cores" =~ ^[0-9]+$ ]] || ((cores < 1 || cores > total_cores)); then
     echo "Invalid input; using 2 cores"
     cores=2
@@ -122,14 +128,14 @@ install_vm() {
   done
   default_disk="64"
   echo "$disk_options" | grep -q 64 || default_disk="32"
-  disk=$(gum_choose DEVBOX_VM_DISK "How much disk for the Windows VM? (64GB+ recommended)" "$default_disk" "${disk_options# }")
-  [[ -n "$disk" ]] || die "install cancelled"
+  disk="$(gum_choose DEVBOX_VM_DISK "How much disk for the Windows VM? (64GB+ recommended)" "$default_disk" "${disk_options# }")" || cancel
+  [[ -n "$disk" ]] || cancel
   disk="${disk%G}G"
   check_prerequisites "${disk%G}"
 
-  user=$(gum_input DEVBOX_VM_USER "Windows username (default: devbox)?" "devbox")
+  user="$(gum_input DEVBOX_VM_USER "Windows username (default: devbox)?" "devbox")" || cancel
   [[ -n "$user" ]] || user="devbox"
-  pass=$(gum_input DEVBOX_VM_PASS "Windows password (default: admin)?" "admin" --password)
+  pass="$(gum_input DEVBOX_VM_PASS "Windows password (default: admin)?" "admin" --password)" || cancel
   local pass_display="(default)"
   if [[ -n "$pass" ]]; then
     pass_display="(user-defined)"
@@ -137,11 +143,11 @@ install_vm() {
     pass="admin"
   fi
 
-  version=$(gum_choose DEVBOX_VM_VERSION "Windows version (dockurr/windows VERSION)" "11" "11
+  version="$(gum_choose DEVBOX_VM_VERSION "Windows version (dockurr/windows VERSION)" "11" "11
 10
 2022
-2019")
-  [[ -n "$version" ]] || die "install cancelled"
+2019")" || cancel
+  [[ -n "$version" ]] || cancel
 
   gum style --border normal --padding "1 2" --margin "1" --align left --bold \
     "Windows VM Configuration" \
@@ -160,7 +166,7 @@ install_vm() {
     [[ -n "${!var:-}" ]] || unattended=1
   done
   if ((unattended == 1)); then
-    gum confirm "Proceed with this configuration?" || die "install cancelled"
+    gum confirm "Proceed with this configuration?" || cancel
   fi
 
   mkdir -p "$HOME/.config/windows" "$HOME/.windows" "$HOME/Windows"
@@ -290,7 +296,7 @@ remove_vm() {
   require_compose
   [[ -f "$COMPOSE_FILE" ]] || die "Windows VM is not configured."
 
-  gum confirm --default=false "Remove the Windows VM and delete all of its data?" || die "removal cancelled"
+  gum confirm --default=false "Remove the Windows VM and delete all of its data?" || cancel
 
   docker compose -f "$COMPOSE_FILE" down 2>/dev/null || true
   docker rmi "$IMAGE" 2>/dev/null || echo "Image already removed or not found"
@@ -299,13 +305,35 @@ remove_vm() {
   echo "Windows VM removed."
 }
 
+interactive_vm() {
+  local action
+
+  if [[ ! -f "$COMPOSE_FILE" ]]; then
+    install_vm
+    return
+  fi
+
+  action="$(gum choose "Launch" "Status" "Stop" "Remove" "Reinstall" "Quit" \
+    --height 8 --header "Windows VM is configured")" || exit 0
+  [[ -n "$action" ]] || exit 0
+  case "$action" in
+    Launch) launch_vm ;;
+    Status) status_vm ;;
+    Stop) stop_vm ;;
+    Remove) remove_vm ;;
+    Reinstall) install_vm ;;
+    *) exit 0 ;;
+  esac
+}
+
 case "${1:-}" in
   install) install_vm "${@:2}" ;;
   launch|start) launch_vm "${2:-}" ;;
   stop|down) stop_vm ;;
   status) status_vm ;;
   remove) remove_vm ;;
-  help|-h|--help|"") usage ;;
+  help|-h|--help) usage ;;
+  "") interactive_vm ;;
   *)
     echo "devbox vm: unknown command '${1}'" >&2
     echo >&2

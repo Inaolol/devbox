@@ -8,7 +8,7 @@ Run `devbox` to open the interactive menu, or call a command directly:
 
   devbox setup            Run the interactive onboarding
   devbox db [db...]       Install or remove development databases
-  devbox vm <cmd>         Manage the Windows VM
+  devbox vm [cmd]         Manage the Windows VM (interactive by default)
   devbox install [app]    Install adguard, tailscale, 1password, or all
   devbox remove [app]     Remove adguard, tailscale, or 1password
   devbox update           Fetch the latest DevBox and update everything
@@ -75,7 +75,11 @@ with: devbox db remove <db>; list with: devbox db list.
 Windows VM (devbox vm)
 
 Runs Windows (11 by default) in Docker via dockurr/windows. Needs
-KVM (/dev/kvm) and about 10GB free on top of the chosen disk size:
+KVM (/dev/kvm) and about 10GB free on top of the chosen disk size.
+
+Run `devbox vm` for an interactive session: it walks you through
+installing the VM, or asks what to do with an existing one. The full
+command reference is at `devbox vm --help`:
 
   devbox vm install       Create the VM; asks for RAM, cores, disk,
                           version, and credentials (all overridable

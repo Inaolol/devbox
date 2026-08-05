@@ -138,13 +138,14 @@ DEVBOX_NO_TMUX=1 bash
 
 ## DevBox CLI
 
-After install, `devbox` opens an interactive menu (Setup, Databases, Install,
-Remove, Update, Help) and also works directly:
+After install, `devbox` opens an interactive menu (Setup, Databases, Windows VM,
+Install, Remove, Update, Help) and also works directly:
 
 ```bash
 devbox setup                  # interactive onboarding (same as devbox-setup)
 devbox db postgres redis      # development databases in Docker
 devbox db                     # choose databases interactively
+devbox vm                     # interactive: install, or manage the VM
 devbox vm install             # Windows VM in Docker (dockurr/windows)
 devbox vm launch              # start the VM and print connection details
 devbox install adguard        # optional components: adguard, tailscale, 1password, all
@@ -186,6 +187,7 @@ touching your server OS. Needs KVM (`/dev/kvm`) and about 10GB of free
 space on top of the chosen disk size:
 
 ```bash
+devbox vm                     # interactive: install, or manage the VM
 devbox vm install             # pick RAM, cores, disk, version, credentials
 devbox vm launch              # start the VM and wait for Windows to boot
 devbox vm stop                # stop the VM
