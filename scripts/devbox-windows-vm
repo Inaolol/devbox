@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+COMPOSE_FILE="$HOME/.config/windows/docker-compose.yml"
+CONTAINER="devbox-windows"
+IMAGE="dockurr/windows"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  devbox vm install [--ram N G] [--cores N] [--disk N G] [--user NAME] [--pass PASS] [--version V]
+              Create the Windows VM (interactive unless options are given)
+  devbox vm launch [--keep-alive|-k]   Start the VM and print connection details
+  devbox vm stop                        Stop the VM
+  devbox vm status                      Show VM status and connection details
+  devbox vm remove                      Stop the VM and delete it and its data
+  devbox vm help                        Show this help
+
+The VM runs as a Docker container (dockurr/windows) and needs KVM
+(/dev/kvm) and roughly 10GB free on top of the chosen disk size. Windows is
+downloaded and installed on first start, which can take 10-15 minutes.
+
+Ports are bound to 127.0.0.1 only. From another machine, tunnel first:
+  ssh -L 3389:127.0.0.1:3389 -L 8006:127.0.0.1:8006 user@server
+Then open http://localhost:8006 (installation progress) or connect an RDP
+client to localhost:3389 with the credentials set during install.
+
+The username/password are stored in plain text in
+~/.config/windows/docker-compose.yml.
+USAGE
+}
+
+die() {
+  echo "devbox vm: $*" >&2
+  exit 1
+}
+
+require_compose() {
+  command -v docker >/dev/null 2>&1 || die "docker is not installed. Run: devbox install"
+  docker compose version >/dev/null 2>&1 || die "docker compose plugin is not available"
+}
+
+check_prerequisites() {
+  local disk_gb="${1:-64}"
+  local required_gb=$((disk_gb + 10))
+  local available_gb
+
+  if [[ ! -e /dev/kvm ]]; then
+    gum style --border normal --padding "1 2" --margin "1" \
+      "KVM virtualization is not available." \
+      "" \
+      "Enable virtualization in the BIOS, or on a VPS enable nested" \
+      "virtualization for this instance. On bare metal, try:" \
+      "  sudo modprobe kvm-intel   # Intel CPUs" \
+      "  sudo modprobe kvm-amd     # AMD CPUs" >&2
+    exit 1
+  fi
+
+  available_gb=$(df "$HOME" | awk 'NR==2 {print int($4/1024/1024)}')
+  if ((available_gb < required_gb)); then
+    die "insufficient disk space: ${available_gb}GB free, need ${required_gb}GB (${disk_gb}GB disk + 10GB for the Windows image)"
+  fi
+}
+
+gum_choose() {
+  local env_name="$1" header="$2" selected="$3" options="${4}"
+  if [[ -n "${!env_name:-}" ]]; then
+    printf '%s' "${!env_name}"
+  else
+    printf '%s\n' "$options" | gum choose --selected="$selected" --header "$header" --height 8
+  fi
+}
+
+gum_input() {
+  local env_name="$1" header="$2" placeholder="$3" password="${4:-}"
+  if [[ -n "${!env_name:-}" ]]; then
+    printf '%s' "${!env_name}"
+  else
+    if [[ "$password" == "--password" ]]; then
+      gum input --placeholder "$placeholder" --header "$header" --password
+    else
+      gum input --placeholder "$placeholder" --header "$header"
+    fi
+  fi
+}
+
+install_vm() {
+  require_compose
+  check_prerequisites
+
+  local total_ram_gb total_cores available_gb max_disk_gb
+  local ram="" cores="" disk="" user="" pass="" version=""
+  local ram_options="" disk_options="" default_disk
+
+  total_ram_gb=$(awk 'NR==1 {printf "%d", $2/1024/1024}' /proc/meminfo)
+  total_cores=$(nproc)
+  available_gb=$(df "$HOME" | awk 'NR==2 {print int($4/1024/1024)}')
+  max_disk_gb=$((available_gb - 10))
+
+  echo "Detected: ${total_ram_gb}GB RAM, ${total_cores} cores, ${available_gb}GB free disk"
+
+  for size in 2 4 8 16 32 64; do
+    ((size <= total_ram_gb)) && ram_options="$ram_options $size"
+  done
+  [[ -n "$ram_options" ]] || die "at least 2GB of RAM is required for the Windows VM"
+  ram=$(gum_choose DEVBOX_VM_RAM "How much RAM for the Windows VM?" "${ram_options##* }" "${ram_options# }")
+  [[ -n "$ram" ]] || die "install cancelled"
+  ram="${ram%G}G"
+
+  cores=$(gum_input DEVBOX_VM_CORES "Number of CPU cores (1-$total_cores)?" "2")
+  [[ -n "$cores" ]] || die "install cancelled"
+  if ! [[ "$cores" =~ ^[0-9]+$ ]] || ((cores < 1 || cores > total_cores)); then
+    echo "Invalid input; using 2 cores"
+    cores=2
+  fi
+
+  if ((max_disk_gb < 32)); then
+    die "insufficient disk space for a Windows VM: ${available_gb}GB free, at least 42GB needed"
+  fi
+  for size in 32 64 128 256 512; do
+    ((size <= max_disk_gb)) && disk_options="$disk_options $size"
+  done
+  default_disk="64"
+  echo "$disk_options" | grep -q 64 || default_disk="32"
+  disk=$(gum_choose DEVBOX_VM_DISK "How much disk for the Windows VM? (64GB+ recommended)" "$default_disk" "${disk_options# }")
+  [[ -n "$disk" ]] || die "install cancelled"
+  disk="${disk%G}G"
+  check_prerequisites "${disk%G}"
+
+  user=$(gum_input DEVBOX_VM_USER "Windows username (default: devbox)?" "devbox")
+  [[ -n "$user" ]] || user="devbox"
+  pass=$(gum_input DEVBOX_VM_PASS "Windows password (default: admin)?" "admin" --password)
+  local pass_display="(default)"
+  if [[ -n "$pass" ]]; then
+    pass_display="(user-defined)"
+  else
+    pass="admin"
+  fi
+
+  version=$(gum_choose DEVBOX_VM_VERSION "Windows version (dockurr/windows VERSION)" "11" "11
+10
+2022
+2019")
+  [[ -n "$version" ]] || die "install cancelled"
+
+  gum style --border normal --padding "1 2" --margin "1" --align left --bold \
+    "Windows VM Configuration" \
+    "" \
+    "RAM:       $ram" \
+    "CPU:       ${cores} cores" \
+    "Disk:      $disk" \
+    "Version:   $version" \
+    "Username:  $user" \
+    "Password:  $pass_display"
+
+  # A fully env-driven install (all DEVBOX_VM_* variables set) runs
+  # unattended, without the confirmation prompt.
+  local unattended=0
+  for var in DEVBOX_VM_RAM DEVBOX_VM_CORES DEVBOX_VM_DISK DEVBOX_VM_USER DEVBOX_VM_PASS DEVBOX_VM_VERSION; do
+    [[ -n "${!var:-}" ]] || unattended=1
+  done
+  if ((unattended == 1)); then
+    gum confirm "Proceed with this configuration?" || die "install cancelled"
+  fi
+
+  mkdir -p "$HOME/.config/windows" "$HOME/.windows" "$HOME/Windows"
+
+  cat >"$COMPOSE_FILE" <<EOF
+services:
+  windows:
+    image: ${IMAGE}
+    container_name: ${CONTAINER}
+    environment:
+      VERSION: "${version}"
+      RAM_SIZE: "${ram}"
+      CPU_CORES: "${cores}"
+      DISK_SIZE: "${disk}"
+      USERNAME: "${user}"
+      PASSWORD: "${pass}"
+      TZ: "$(timedatectl show -p Timezone --value 2>/dev/null || echo UTC)"
+      ARGUMENTS: "-rtc base=localtime,clock=host,driftfix=slew"
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - 127.0.0.1:8006:8006
+      - 127.0.0.1:3389:3389/tcp
+      - 127.0.0.1:3389:3389/udp
+    volumes:
+      - $HOME/.windows:/storage
+      - $HOME/Windows:/shared
+    restart: "no"
+    stop_grace_period: 2m
+EOF
+
+  echo
+  echo "Starting the Windows VM. This downloads a Windows image (10-15 minutes)."
+  echo "Monitor installation progress at http://127.0.0.1:8006"
+  echo
+
+  docker compose -f "$COMPOSE_FILE" up -d || die "failed to start the VM (is the docker daemon running?)"
+  echo
+  echo "Windows VM is installing in the background."
+  echo "Monitor:  http://127.0.0.1:8006"
+  echo "When the installation finishes, connect with: devbox vm launch"
+  echo "To stop the VM: devbox vm stop"
+  echo "To change resources: $COMPOSE_FILE"
+}
+
+launch_vm() {
+  require_compose
+  [[ -f "$COMPOSE_FILE" ]] || die "Windows VM is not configured. Run: devbox vm install"
+
+  local win_user win_pass keep_alive=0
+  win_user=$(grep '^      USERNAME:' "$COMPOSE_FILE" | sed 's/.*"\(.*\)"/\1/')
+  win_pass=$(grep '^      PASSWORD:' "$COMPOSE_FILE" | sed 's/.*"\(.*\)"/\1/')
+  [[ -n "$win_user" ]] || win_user="devbox"
+  [[ -n "$win_pass" ]] || win_pass="admin"
+  if [[ "${1:-}" == "--keep-alive" || "${1:-}" == "-k" ]]; then
+    keep_alive=1
+  fi
+
+  local status
+  status=$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null || true)
+
+  if [[ "$status" != "running" ]]; then
+    echo "Starting the Windows VM..."
+    docker compose -f "$COMPOSE_FILE" up -d || die "failed to start the VM (logs: docker logs $CONTAINER)"
+    echo "Waiting for Windows to boot..."
+    local waited=0
+    until docker logs "$CONTAINER" 2>&1 | grep -qi "windows started successfully"; do
+      sleep 2
+      waited=$((waited + 1))
+      if ((waited > 60)); then
+        echo "Timed out waiting for Windows to boot after 2 minutes." >&2
+        echo "Check progress: docker logs -f $CONTAINER" >&2
+        exit 1
+      fi
+    done
+  fi
+
+  gum style --border normal --padding "1 2" --margin "1" --align center \
+    "Windows VM is running" \
+    "" \
+    "From this server:     RDP to 127.0.0.1:3389  (user $win_user, password $win_pass)" \
+    "From another machine: ssh -L 3389:127.0.0.1:3389 user@$(hostname -I 2>/dev/null | awk '{print $1}')" \
+    "Installation progress: http://127.0.0.1:8006" \
+    "" \
+    "Stop the VM: devbox vm stop"
+
+  if ((keep_alive == 0)); then
+    echo
+    echo "Note: the VM keeps running until you run 'devbox vm stop'."
+  fi
+}
+
+stop_vm() {
+  require_compose
+  [[ -f "$COMPOSE_FILE" ]] || die "Windows VM is not configured."
+  docker compose -f "$COMPOSE_FILE" down
+  echo "Windows VM stopped."
+}
+
+status_vm() {
+  require_compose
+  [[ -f "$COMPOSE_FILE" ]] || die "Windows VM is not configured. Run: devbox vm install"
+
+  local status
+  status=$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null || true)
+  if [[ -z "$status" ]]; then
+    echo "Windows VM has no container yet. First start: devbox vm launch"
+  elif [[ "$status" == "running" ]]; then
+    gum style --border normal --padding "1 2" --margin "1" --align left \
+      "Windows VM Status: RUNNING" \
+      "" \
+      "Web interface: http://127.0.0.1:8006" \
+      "RDP available: 127.0.0.1:3389" \
+      "" \
+      "To connect: devbox vm launch" \
+      "To stop:    devbox vm stop"
+  else
+    echo "Windows VM is stopped (status: $status)"
+    echo "To start: devbox vm launch"
+  fi
+}
+
+remove_vm() {
+  require_compose
+  [[ -f "$COMPOSE_FILE" ]] || die "Windows VM is not configured."
+
+  gum confirm --default=false "Remove the Windows VM and delete all of its data?" || die "removal cancelled"
+
+  docker compose -f "$COMPOSE_FILE" down 2>/dev/null || true
+  docker rmi "$IMAGE" 2>/dev/null || echo "Image already removed or not found"
+  rm -f "$COMPOSE_FILE"
+  rm -rf "$HOME/.windows" "$HOME/Windows"
+  echo "Windows VM removed."
+}
+
+case "${1:-}" in
+  install) install_vm "${@:2}" ;;
+  launch|start) launch_vm "${2:-}" ;;
+  stop|down) stop_vm ;;
+  status) status_vm ;;
+  remove) remove_vm ;;
+  help|-h|--help|"") usage ;;
+  *)
+    echo "devbox vm: unknown command '${1}'" >&2
+    echo >&2
+    usage >&2
+    exit 1
+    ;;
+esac

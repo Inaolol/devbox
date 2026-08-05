@@ -9,12 +9,21 @@ Usage:
   devbox-setup github [--with-token]  Authenticate with GitHub (token is read from stdin)
   devbox-setup tailscale [--hostname NAME] [--auth-key KEY]
   devbox-setup ssh --key PUBLIC_KEY [--disable-password-auth]
+  devbox-setup 1password [--service-token TOKEN]
+  devbox-setup 1password --account ADDRESS EMAIL SECRET_KEY [SHORTHAND]
+  devbox-setup --op ITEM              Run setup from a 1Password item
 
 The SSH command adds a validated public key for regular OpenSSH logins (ssh
 user@host). Tailscale SSH does not need a key; it trusts your tailnet identity.
 Password authentication is changed only when --disable-password-auth is
 explicitly supplied and a valid key is already present in
 ~/.ssh/authorized_keys.
+
+1Password: --service-token takes a service account token (ops_...) and
+--account takes full account details. With --op, devbox-setup reads the item
+(found by name, e.g. "DevBox Setup" or an op://VAULT/ITEM reference) and runs
+Git, GitHub, Tailscale, and SSH setup from its fields: git-name, git-email,
+gh-token, ts-token, ts-host, ssh-key. See docs/1password.md.
 USAGE
 }
 
@@ -32,6 +41,17 @@ prompt() {
   [[ -r /dev/tty ]] || die "interactive input requires a terminal"
   printf '%s' "$message" >/dev/tty
   IFS= read -r value </dev/tty
+  printf '%s' "$value"
+}
+
+secret_prompt() {
+  local message="$1" value
+  [[ -r /dev/tty ]] || die "interactive input requires a terminal"
+  printf '%s' "$message" >/dev/tty
+  stty -echo
+  IFS= read -r value </dev/tty
+  stty echo
+  printf '\n' >/dev/tty
   printf '%s' "$value"
 }
 
@@ -204,6 +224,143 @@ setup_ssh() {
   fi
 }
 
+setup_1password() {
+  local token="" account_mode=0 address="" email="" secret_key="" shorthand=""
+  while (($#)); do
+    case "$1" in
+      --service-token) token="${2:-}"; shift 2 ;;
+      --account) account_mode=1; address="${2:-}"; email="${3:-}"; secret_key="${4:-}"; shorthand="${5:-}"; shift 5 ;;
+      *) die "unknown 1password option: $1" ;;
+    esac
+  done
+
+  need op
+  if op whoami >/dev/null 2>&1; then
+    echo "✓ 1Password is already authenticated"
+    return
+  fi
+
+  if ((account_mode)); then
+    setup_1password_account "$address" "$email" "$secret_key" "$shorthand"
+    return
+  fi
+
+  if [[ -z "$token" ]]; then
+    echo "1Password service accounts are created at 1Password.com under Developer → Service Accounts."
+    echo "The token looks like ops_eyJ... and grants the CLI scoped, revocable access."
+    token="$(secret_prompt '1Password service token: ')"
+  fi
+  [[ -n "$token" ]] || die "a 1Password service token is required"
+
+  export OP_SERVICE_ACCOUNT_TOKEN="$token"
+  if ! op whoami >/dev/null 2>&1; then
+    die "1Password rejected the service token"
+  fi
+
+  if confirm "Persist the token in ~/.config/shell/envs so future login sessions can use it?"; then
+    persist_op_service_token "$token"
+  fi
+
+  echo "✓ 1Password service account configured"
+  echo "With op authenticated you can also seed all other setup from one item: devbox-setup --op 'DevBox Setup'"
+}
+
+persist_op_service_token() {
+  local token="$1" env_file="$HOME/.config/shell/envs" line
+  line="export OP_SERVICE_ACCOUNT_TOKEN=\"$token\""
+  mkdir -p "$(dirname "$env_file")"
+  if [[ -f "$env_file" ]] && grep -q '^export OP_SERVICE_ACCOUNT_TOKEN=' "$env_file"; then
+    sed -i "s|^export OP_SERVICE_ACCOUNT_TOKEN=.*|$line|" "$env_file"
+  else
+    printf '%s\n' "$line" >>"$env_file"
+  fi
+  chmod 600 "$env_file"
+}
+
+setup_1password_account() {
+  local address="${1:-}" email="${2:-}" secret_key="${3:-}" shorthand="${4:-}" password="" session
+
+  address="${address:-$(prompt '1Password sign-in address (e.g. yourname.1password.com): ')}"
+  email="${email:-$(prompt '1Password email: ')}"
+  secret_key="${secret_key:-$(secret_prompt '1Password secret key: ')}"
+  shorthand="${shorthand:-$(prompt 'Account shorthand (optional): ')}"
+  password="$(secret_prompt '1Password password: ')"
+  [[ -n "$address" && -n "$email" && -n "$secret_key" && -n "$password" ]] || die "all account details are required"
+
+  local account_args=()
+  if ! op account list --format json 2>/dev/null | jq -e 'length > 0' >/dev/null 2>&1; then
+    account_args=(account add --address "$address" --email "$email" --secret-key "$secret_key" --signin)
+    [[ -n "$shorthand" ]] && account_args+=(--shorthand "$shorthand")
+    session="$(printf '%s\n' "$password" | op "${account_args[@]}")" || die "1Password sign-in failed"
+  else
+    account_args=(signin)
+    if [[ -n "$shorthand" ]]; then
+      account_args+=(--account "$shorthand")
+    elif [[ -n "$address" ]]; then
+      account_args+=(--account "$address")
+    fi
+    session="$(printf '%s\n' "$password" | op "${account_args[@]}")" || die "1Password sign-in failed"
+  fi
+
+  eval "$session"
+  echo "✓ 1Password account configured"
+}
+
+op_item_field() {
+  printf '%s' "$1" | jq -r --arg field "$2" '
+    (.fields // []) |
+    (
+      map(select((.section? == null) and (.label == $field or .id == $field))) +
+      map(select(.label == $field or .id == $field))
+    ) |
+    .[0].value // empty
+  '
+}
+
+setup_from_op() {
+  local item="${1:-}" json
+  [[ -n "$item" ]] || die "--op requires a 1Password item reference"
+  need op
+  need jq
+
+  echo "Reading DevBox setup fields from 1Password item: $item"
+  if [[ $item == op://* ]]; then
+    json="$(op item get "${item#op://}" --format json 2>/dev/null)" || die "could not read 1Password item: $item"
+  else
+    json="$(op item get "$item" --format json 2>/dev/null)" || die "could not read 1Password item: $item"
+  fi
+
+  local git_name git_email gh_token ts_token ts_host ssh_key applied=0
+  git_name="$(op_item_field "$json" git-name)"
+  git_email="$(op_item_field "$json" git-email)"
+  gh_token="$(op_item_field "$json" gh-token)"
+  ts_token="$(op_item_field "$json" ts-token)"
+  ts_host="$(op_item_field "$json" ts-host)"
+  ssh_key="$(op_item_field "$json" ssh-key)"
+
+  if [[ -n "$git_name" || -n "$git_email" ]]; then
+    if [[ -n "$git_name" && -n "$git_email" ]]; then
+      setup_git --name "$git_name" --email "$git_email"; applied=1
+    else
+      die "the 1Password item must set both git-name and git-email"
+    fi
+  fi
+  if [[ -n "$gh_token" ]]; then
+    printf '%s' "$gh_token" | setup_github --with-token; applied=1
+  fi
+  if [[ -n "$ts_token" ]]; then
+    setup_tailscale --hostname "${ts_host:-$(hostname -s)}" --auth-key "$ts_token"; applied=1
+  fi
+  if [[ -n "$ssh_key" ]]; then
+    setup_ssh --key "$ssh_key"; applied=1
+  fi
+
+  if ((applied == 0)); then
+    die "the 1Password item has no recognized DevBox fields"
+  fi
+  echo "✓ DevBox setup applied from 1Password"
+}
+
 interactive_setup() {
   echo "Devbox service onboarding"
   echo
@@ -227,6 +384,16 @@ interactive_setup() {
   elif confirm "Add an SSH public key for regular OpenSSH logins (not Tailscale SSH)?"; then
     setup_ssh
   fi
+  if command -v op >/dev/null 2>&1 && op whoami >/dev/null 2>&1; then
+    echo "✓ 1Password is already authenticated"
+  elif command -v op >/dev/null 2>&1 && confirm "Authenticate with 1Password?"; then
+    setup_1password
+  fi
+  if command -v tailscale >/dev/null 2>&1 && ! tailscale ip -4 >/dev/null 2>&1; then
+    echo
+    echo "Tailscale is installed but not connected. Run: sudo tailscale up"
+    echo "(devbox-setup tailscale with an auth key, or --op, can do this for you.)"
+  fi
   echo
   echo "Onboarding complete."
 }
@@ -239,6 +406,8 @@ case "$command" in
   github) setup_github "$@" ;;
   tailscale) setup_tailscale "$@" ;;
   ssh) setup_ssh "$@" ;;
+  1password) setup_1password "$@" ;;
+  --op) setup_from_op "${1:-}" ;;
   -h|--help|help) usage ;;
   *) usage >&2; exit 2 ;;
 esac

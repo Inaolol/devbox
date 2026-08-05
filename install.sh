@@ -15,7 +15,7 @@ usage() {
 Usage: ./install.sh [options]
 
 Options:
-  --only COMPONENT       Install one component: base, docker, tailscale, terminal, ai, configs, services, adguard
+  --only COMPONENT       Install one component: base, docker, tailscale, terminal, ai, 1password, configs, services, adguard
   --without-ai           Skip AI command line tools
   --without-tailscale    Skip Tailscale
   --with-adguard         Install AdGuard Home ad blocker (opt-in)
@@ -60,6 +60,7 @@ source "$REPO_ROOT/scripts/install-docker.sh"
 source "$REPO_ROOT/scripts/install-tailscale.sh"
 source "$REPO_ROOT/scripts/install-terminal.sh"
 source "$REPO_ROOT/scripts/install-ai.sh"
+source "$REPO_ROOT/scripts/install-1password.sh"
 source "$REPO_ROOT/scripts/install-configs.sh"
 source "$REPO_ROOT/scripts/install-services.sh"
 source "$REPO_ROOT/scripts/install-adguard.sh"
@@ -74,10 +75,11 @@ run_component docker install_docker
 if [[ "$WITHOUT_TAILSCALE" -eq 0 ]]; then run_component tailscale install_tailscale; fi
 run_component terminal install_terminal
 if [[ "$WITHOUT_AI" -eq 0 ]]; then run_component ai install_ai; fi
+run_component 1password install_1password
 if [[ "$DEVBOX_UPDATE" -eq 0 || -n "$ONLY" ]]; then
   run_component configs install_configs
 else
-  log "Keeping existing user configuration during update"
+  run_component configs refresh_configs
 fi
 run_component services install_services
 

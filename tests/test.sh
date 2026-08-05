@@ -6,6 +6,7 @@ find "$ROOT" -type f -name '*.sh' -print0 | while IFS= read -r -d '' file; do
   bash -n "$file"
 done
 bash -n "$ROOT/scripts/devbox-setup" "$ROOT/configs/shell/devbox-server"
+bash -n "$ROOT/bin/devbox" "$ROOT/scripts/devbox-db"
 
 if command -v shellcheck >/dev/null 2>&1; then
   find "$ROOT" -type f -name '*.sh' -print0 | xargs -0 shellcheck
@@ -18,7 +19,9 @@ fi
 grep -q 'set -Eeuo pipefail' "$ROOT/install.sh"
 grep -q 'require_supported_os' "$ROOT/install.sh"
 grep -q 'run_component services install_services' "$ROOT/install.sh"
-grep -q 'Keeping existing user configuration during update' "$ROOT/install.sh"
+grep -q 'run_component 1password install_1password' "$ROOT/install.sh"
+grep -q '1password' "$ROOT/install.sh"
+grep -q 'run_component configs refresh_configs' "$ROOT/install.sh"
 grep -q '.local/state/devbox' "$ROOT/install.sh"
 grep -q 'run_migrations' "$ROOT/install.sh"
 grep -q '.local/state/devbox/migrations' "$ROOT/scripts/migrations.sh"
@@ -109,6 +112,79 @@ grep -q 'not Tailscale SSH' "$ROOT/scripts/devbox-setup"
 grep -q -- '--with-adguard' "$ROOT/install.sh"
 grep -q 'adguard/adguardhome' "$ROOT/scripts/install-adguard.sh"
 grep -q '53:53' "$ROOT/scripts/install-adguard.sh"
+
+# 1Password CLI component: official apt repo, CLI package, and setup hint.
+grep -q '1password-cli' "$ROOT/scripts/install-1password.sh"
+grep -q 'downloads.1password.com' "$ROOT/scripts/install-1password.sh"
+grep -q 'devbox-setup 1password' "$ROOT/scripts/install-1password.sh"
+grep -q '1password.asc' "$ROOT/scripts/install-1password.sh"
+
+# devbox-setup: 1Password auth, --op item seeding, and the Tailscale hint.
+grep -q -- '--op ITEM' "$ROOT/scripts/devbox-setup"
+grep -q 'setup_from_op' "$ROOT/scripts/devbox-setup"
+grep -q 'op item get' "$ROOT/scripts/devbox-setup"
+grep -q 'git-name' "$ROOT/scripts/devbox-setup"
+grep -q 'gh-token' "$ROOT/scripts/devbox-setup"
+grep -q 'OP_SERVICE_ACCOUNT_TOKEN' "$ROOT/scripts/devbox-setup"
+grep -q 'devbox-setup 1password' "$ROOT/scripts/devbox-setup"
+grep -q '1Password rejected the service token' "$ROOT/scripts/devbox-setup"
+grep -q 'sudo tailscale up' "$ROOT/scripts/devbox-setup"
+
+# Services installs the devbox CLI, devbox-db, and the 1Password env hooks.
+grep -q 'devbox-db' "$ROOT/scripts/install-services.sh"
+grep -q 'DEVBOX_SETUP_OP_TOKEN' "$ROOT/scripts/install-services.sh"
+grep -q -- '--op' "$ROOT/scripts/install-services.sh"
+grep -q 'install_devbox_cli' "$ROOT/scripts/install-services.sh"
+grep -q 'DEVBOX_PATH' "$ROOT/scripts/install-services.sh"
+
+# Editor configs: Neovim QoL plugins and lazygit config are managed files.
+grep -q 'configs/nvim/plugins' "$ROOT/scripts/install-configs.sh"
+grep -q 'configs/lazygit/config.yml' "$ROOT/scripts/install-configs.sh"
+grep -q 'refresh_configs' "$ROOT/scripts/install-configs.sh"
+grep -q 'refresh_managed_file' "$ROOT/scripts/install-configs.sh"
+# Refresh shows the diff between the backup and the new config, omarchy-style.
+grep -q 'diff -u' "$ROOT/scripts/install-configs.sh"
+# Update refresh must preserve a persisted 1Password service token.
+grep -q 'OP_SERVICE_ACCOUNT_TOKEN' "$ROOT/scripts/install-configs.sh"
+test -f "$ROOT/configs/nvim/plugins/colorscheme.lua"
+test -f "$ROOT/configs/nvim/plugins/disable-news-alert.lua"
+test -f "$ROOT/configs/nvim/plugins/snacks-animated-scrolling.lua"
+test -f "$ROOT/configs/lazygit/config.yml"
+grep -q '#7aa2f7' "$ROOT/configs/lazygit/config.yml"
+grep -q 'showGraph' "$ROOT/configs/lazygit/config.yml"
+grep -q 'lazygit' "$ROOT/migrations/20260805-install-editor-configs.sh"
+grep -q 'colorscheme.lua' "$ROOT/migrations/20260805-install-editor-configs.sh"
+
+# Dev databases: localhost-only containers for the full dev stack.
+grep -q '127.0.0.1' "$ROOT/scripts/devbox-db"
+grep -q 'postgres:18' "$ROOT/scripts/devbox-db"
+grep -q 'mysql:8.4' "$ROOT/scripts/devbox-db"
+grep -q 'redis:7' "$ROOT/scripts/devbox-db"
+grep -q 'gum choose' "$ROOT/scripts/devbox-db"
+grep -q 'devbox-db remove' "$ROOT/scripts/devbox-db"
+
+# The devbox CLI menu and subs.
+grep -q 'DEVBOX_PATH' "$ROOT/bin/devbox"
+grep -q 'devbox-sub' "$ROOT/bin/devbox"
+grep -q 'gum choose' "$ROOT/bin/devbox-sub/menu.sh"
+grep -q -- '--only adguard' "$ROOT/bin/devbox-sub/install.sh"
+grep -q 'tailscaled' "$ROOT/bin/devbox-sub/remove.sh"
+grep -q 'bootstrap.sh' "$ROOT/bin/devbox-sub/update.sh"
+grep -q 'docs/1password.md' "$ROOT/bin/devbox-sub/help.sh"
+
+# Windows VM: dockurr/windows compose file, KVM check, localhost-only ports,
+# env-var overrides for unattended installs, and the SSH tunnel hint.
+grep -q 'dockurr/windows' "$ROOT/scripts/devbox-windows-vm"
+grep -q '/dev/kvm' "$ROOT/scripts/devbox-windows-vm"
+grep -q '127.0.0.1:3389' "$ROOT/scripts/devbox-windows-vm"
+grep -q '127.0.0.1:8006' "$ROOT/scripts/devbox-windows-vm"
+grep -q 'DEVBOX_VM_RAM' "$ROOT/scripts/devbox-windows-vm"
+grep -q 'DEVBOX_VM_VERSION' "$ROOT/scripts/devbox-windows-vm"
+grep -q 'ssh -L 3389' "$ROOT/scripts/devbox-windows-vm"
+grep -q 'windows started successfully' "$ROOT/scripts/devbox-windows-vm"
+grep -q 'docker compose' "$ROOT/scripts/devbox-windows-vm"
+grep -q 'windows-vm' "$ROOT/bin/devbox-sub/menu.sh"
+test -x "$ROOT/scripts/devbox-windows-vm"
 
 # Test OS detection independently of the host running the test.
 # ROOT is computed at runtime, so ShellCheck cannot resolve this source path.

@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  devbox-db                     Choose databases interactively to install
+  devbox-db [db...]             Install the named databases
+  devbox-db remove [db...]      Stop and remove the named databases
+  devbox-db remove              Choose installed databases interactively
+  devbox-db list                Show installed development databases
+
+Databases (Docker, bound to 127.0.0.1 only):
+  mysql     MySQL 8.4      port 3306  user root, empty password
+  postgres  PostgreSQL 18  port 5432  trust auth, superuser postgres
+  mariadb   MariaDB 11.8   port 3306  user root, empty password
+  redis     Redis 7        port 6379  no password
+  mongo     MongoDB        port 27017 user admin, password admin123
+  mssql     MSSQL 2022     port 1433  user sa, password @dmin123 (amd64 only)
+
+These are development credentials for local work. Every container is bound
+to 127.0.0.1 and is not reachable from the network.
+USAGE
+}
+
+db_name() {
+  local name=""
+  case "$1" in
+    mysql) name="mysql8" ;;
+    postgres) name="postgres18" ;;
+    mariadb) name="mariadb11" ;;
+    redis) name="redis" ;;
+    mongo) name="mongodb" ;;
+    mssql) name="mssql" ;;
+  esac
+  printf '%s' "$name"
+}
+
+die() {
+  echo "devbox-db: $*" >&2
+  exit 1
+}
+
+valid_db() {
+  [[ -n "$(db_name "$1")" ]]
+}
+
+db_info() {
+  case "$1" in
+    mysql) echo "mysql:     127.0.0.1:3306  user root, empty password" ;;
+    postgres) echo "postgres:  127.0.0.1:5432  trust auth (no password), superuser postgres" ;;
+    mariadb) echo "mariadb:   127.0.0.1:3306  user root, empty password" ;;
+    redis) echo "redis:     127.0.0.1:6379  no password" ;;
+    mongo) echo "mongo:     127.0.0.1:27017 user admin, password admin123" ;;
+    mssql) echo "mssql:     127.0.0.1:1433  user sa, password @dmin123" ;;
+  esac
+}
+
+container_exists() {
+  sudo docker ps -a --format '{{.Names}}' | grep -qx "$(db_name "$1")"
+}
+
+install_db() {
+  local db="$1" container
+  container="$(db_name "$db")"
+
+  if container_exists "$db"; then
+    echo "Already installed: $db ($container)"
+    return
+  fi
+
+  echo "Installing $db..."
+  case "$db" in
+    mysql)
+      sudo docker run -d --restart unless-stopped -p 127.0.0.1:3306:3306 --name "$container" \
+        -e MYSQL_ROOT_PASSWORD= -e MYSQL_ALLOW_EMPTY_PASSWORD=true mysql:8.4 ;;
+    postgres)
+      sudo docker run -d --restart unless-stopped -p 127.0.0.1:5432:5432 --name "$container" \
+        -e POSTGRES_HOST_AUTH_METHOD=trust postgres:18 ;;
+    mariadb)
+      sudo docker run -d --restart unless-stopped -p 127.0.0.1:3306:3306 --name "$container" \
+        -e MARIADB_ROOT_PASSWORD= -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=true mariadb:11.8 ;;
+    redis)
+      sudo docker run -d --restart unless-stopped -p 127.0.0.1:6379:6379 --name "$container" redis:7 ;;
+    mongo)
+      sudo docker run -d --restart unless-stopped -p 127.0.0.1:27017:27017 --name "$container" \
+        -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=admin123 mongo:noble ;;
+    mssql)
+      sudo docker run -d --restart unless-stopped -p 127.0.0.1:1433:1433 --name "$container" \
+        -e MSSQL_PID=Developer -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=@dmin123" \
+        mcr.microsoft.com/mssql/server:2022-CU12-ubuntu-22.04 ;;
+  esac
+
+  db_info "$db"
+}
+
+remove_db() {
+  local db="$1" container
+  container="$(db_name "$db")"
+
+  if ! container_exists "$db"; then
+    echo "Not installed: $db"
+    return
+  fi
+
+  echo "Removing $db ($container)..."
+  sudo docker rm -f "$container" >/dev/null
+}
+
+list_dbs() {
+  local running
+  running="$(sudo docker ps -a --format '{{.Names}}')"
+
+  local -a installed=()
+  for db in mysql postgres mariadb redis mongo mssql; do
+    if printf '%s\n' "$running" | grep -qx "$(db_name "$db")"; then
+      installed+=("$db")
+    fi
+  done
+
+  if ((${#installed[@]} == 0)); then
+    echo "No development databases installed. Install one with: devbox-db postgres redis"
+    return
+  fi
+
+  echo "Installed development databases (all bound to 127.0.0.1):"
+  for db in "${installed[@]}"; do
+    echo "  $(db_info "$db")"
+  done
+}
+
+choose_install() {
+  local choices
+  choices="$(printf '%s\n' "MySQL" "PostgreSQL" "MariaDB" "Redis" "MongoDB" "MSSQL" |
+    gum choose --no-limit --height 8 --header "Select development databases (Docker, localhost only)")" || return 1
+  [[ -n "$choices" ]] || return 0
+
+  local db
+  while IFS= read -r choice; do
+    [[ -n "$choice" ]] || continue
+    db="$(echo "$choice" | tr '[:upper:]' '[:lower:]')"
+    install_db "$db"
+  done <<<"$choices"
+}
+
+choose_remove() {
+  local running choices
+  running="$(sudo docker ps -a --format '{{.Names}}')"
+
+  local -a installed=()
+  for db in mysql postgres mariadb redis mongo mssql; do
+    if printf '%s\n' "$running" | grep -qx "$(db_name "$db")"; then
+      installed+=("$db")
+    fi
+  done
+
+  if ((${#installed[@]} == 0)); then
+    echo "No development databases installed."
+    return 0
+  fi
+
+  choices="$(printf '%s\n' "${installed[@]}" |
+    gum choose --no-limit --height 8 --header "Select databases to remove")" || return 1
+  [[ -n "$choices" ]] || return 0
+
+  while IFS= read -r db; do
+    [[ -n "$db" ]] || continue
+    remove_db "$db"
+  done <<<"$choices"
+}
+
+command="${1:-}"
+
+case "$command" in
+  "") choose_install ;;
+  remove)
+    shift
+    if (($# == 0)); then
+      choose_remove
+    else
+      for db in "$@"; do
+        valid_db "$db" || die "unknown database: $db"
+        remove_db "$db"
+      done
+    fi
+    ;;
+  list) list_dbs ;;
+  -h|--help|help) usage ;;
+  *)
+    for db in "$@"; do
+      valid_db "$db" || die "unknown database: $db (see devbox-db help)"
+      install_db "$db"
+    done
+    ;;
+esac
