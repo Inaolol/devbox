@@ -49,12 +49,22 @@ command -v gum >/dev/null 2>&1 || {
 }
 
 while :; do
+  clear
+  source "$DEVBOX_PATH/bin/devbox-sub/header.sh"
   choice="$(gum choose "Setup" "Databases" "Windows VM" "Install" "Remove" "Update" "Help" "Quit" \
     --height 10 --header "DevBox")" || exit 0
   [[ -n "$choice" ]] || exit 0
   sub="$(printf '%s' "$choice" | tr '[:upper:]' '[:lower:]')"
   [[ "$sub" == "quit" ]] && exit 0
-  run_sub "$sub" || true
+  if run_sub "$sub"; then
+    rc=0
+  else
+    rc=$?
+  fi
   [[ "$sub" == "help" ]] && exit 0
-  echo
+  if ((rc != 0)); then
+    echo
+    echo "devbox: press Enter to return to the menu"
+    read -r
+  fi
 done

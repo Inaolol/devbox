@@ -4,7 +4,4 @@ set -Eeuo pipefail
 DEVBOX_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export DEVBOX_PATH
 
-if (($# == 0)); then
-  source "$DEVBOX_PATH/bin/devbox-sub/header.sh"
-fi
 source "$DEVBOX_PATH/bin/devbox-sub/menu.sh" "$@"

@@ -192,9 +192,12 @@ grep -q 'Windows VM is configured' "$ROOT/scripts/devbox-windows-vm"
 grep -q 'Reinstall' "$ROOT/scripts/devbox-windows-vm"
 # The menu must survive failing subs and return to the loop, and cancels
 # must not be errors.
-grep -q 'run_sub "$sub" || true' "$ROOT/bin/devbox-sub/menu.sh"
+grep -q 'if run_sub "$sub"; then' "$ROOT/bin/devbox-sub/menu.sh"
 grep -q 'exited with an error (code' "$ROOT/bin/devbox-sub/menu.sh"
 grep -q "\[\[ \"\$sub\" == \"help\" \]\] && exit 0" "$ROOT/bin/devbox-sub/menu.sh"
+grep -q 'clear' "$ROOT/bin/devbox-sub/menu.sh"
+grep -q 'header.sh' "$ROOT/bin/devbox-sub/menu.sh"
+grep -q 'press Enter to return to the menu' "$ROOT/bin/devbox-sub/menu.sh"
 grep -q 'cancel()' "$ROOT/scripts/devbox-windows-vm"
 grep -q "tr ' ' '\\\\n'" "$ROOT/scripts/devbox-windows-vm"
 grep -q '|| return 0' "$ROOT/scripts/devbox-db"
