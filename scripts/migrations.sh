@@ -17,7 +17,7 @@ run_migrations() {
     name="$(basename "$migration")"
     [[ -e "$state_dir/$name" ]] && continue
     log "Running migration ${name%.sh}"
-    bash "$migration"
+    run bash "$migration"
     touch "$state_dir/$name"
   done
 }

@@ -32,9 +32,44 @@ grep -q '.local/state/devbox/migrations' "$ROOT/scripts/migrations.sh"
   REPO_ROOT="$(mktemp -d)"
   HOME="$(mktemp -d)"
   log() { :; }
+  run() { "$@"; }
   source "$ROOT/scripts/migrations.sh"
   run_migrations
   rm -rf "$REPO_ROOT" "$HOME"
+)
+
+# Structured progress: run() captures output into the install log, shows a
+# concise result line, and surfaces the failing output tail on errors.
+grep -q 'DEVBOX_INSTALL_LOG_FILE' "$ROOT/scripts/lib.sh"
+grep -q 'install_start_log' "$ROOT/scripts/lib.sh"
+grep -q 'install_end_log' "$ROOT/scripts/lib.sh"
+grep -q 'install_fail_log' "$ROOT/scripts/lib.sh"
+grep -q '=== Devbox install started' "$ROOT/scripts/lib.sh"
+grep -q '=== Devbox install completed' "$ROOT/scripts/lib.sh"
+grep -q '=== Devbox install FAILED' "$ROOT/scripts/lib.sh"
+grep -q 'Last output' "$ROOT/scripts/lib.sh"
+grep -q "✓" "$ROOT/scripts/lib.sh"
+grep -q "✗" "$ROOT/scripts/lib.sh"
+grep -q 'install_start_log' "$ROOT/install.sh"
+grep -q 'DEVBOX_INSTALL_LOG_FILE' "$ROOT/install.sh"
+grep -q "run bash \"\$migration\"" "$ROOT/scripts/migrations.sh"
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  export DEVBOX_INSTALL_LOG_FILE="$work/install.log"
+  export DRY_RUN=0
+  source "$ROOT/scripts/lib.sh"
+  run printf '%s' 'hidden output' >/dev/null 2>&1
+  grep -q '^hidden output$' "$work/install.log"
+  set +e
+  run sh -c 'echo oops; exit 3' >/dev/null 2>&1
+  status=$?
+  set -e
+  (( status == 3 ))
+  install_start_log
+  install_end_log
+  grep -q '=== Devbox install started:' "$work/install.log"
+  grep -q '=== Devbox install completed:' "$work/install.log"
 )
 grep -q 'docker-ce' "$ROOT/scripts/install-docker.sh"
 grep -q 'podman-docker' "$ROOT/scripts/install-docker.sh"

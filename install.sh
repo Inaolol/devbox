@@ -47,6 +47,10 @@ source "$REPO_ROOT/scripts/lib.sh"
 require_supported_os
 require_non_root
 
+export DEVBOX_INSTALL_LOG_FILE="${DEVBOX_INSTALL_LOG_FILE:-$STATE_DIR/install.log}"
+install_start_log
+trap 'install_fail_log; exit 1' ERR
+
 run_component() {
   local name="$1"
   shift
@@ -92,4 +96,5 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
   touch "$INSTALL_MARKER"
 fi
 
+install_end_log
 log "Installation complete. Sign out and back in if Docker group access was added."
