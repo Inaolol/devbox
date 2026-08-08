@@ -12,7 +12,6 @@ fresh Debian or Ubuntu server by hand.
 - **Editors**: Neovim with LazyVim, plus Vim for plain TTY sessions
 - **Agents**: OpenCode, Claude Code, Codex, Antigravity CLI, and Pi
 - **Dev tools**: mise, Node, Docker, Compose, buildx, GitHub CLI (`gh`), lazygit, lazydocker, and Hunk
-- **Secrets**: 1Password CLI with setup seeding from a 1Password item
 - **Networking**: OpenSSH and Tailscale
 - **Git**: Optional setup for user name/email and GitHub authentication
 - **Ad blocking (opt-in)**: AdGuard Home via Docker Compose
@@ -50,28 +49,17 @@ Run the first-time service setup:
 devbox-setup
 ```
 
-This offers Git identity, GitHub authentication, Tailscale with Tailscale SSH, SSH public-key setup, and 1Password authentication. Run a section directly when needed:
+This offers Git identity, GitHub authentication, Tailscale with Tailscale SSH, and SSH public-key setup. Run a section directly when needed:
 
 ```bash
 devbox-setup git
 devbox-setup github
 devbox-setup tailscale
 devbox-setup ssh --key "ssh-ed25519 AAAA..."
-devbox-setup 1password --service-token "ops_eyJ..."
 ```
 
 `devbox-setup` ends with a reminder to run `sudo tailscale up` when Tailscale
 is installed but not yet connected.
-
-Seed every setup section from one 1Password item (fields `git-name`,
-`git-email`, `gh-token`, `ts-token`, `ts-host`, `ssh-key`):
-
-```bash
-devbox-setup --op "DevBox Setup"
-```
-
-See [docs/1password.md](docs/1password.md) for what 1Password setup does and
-what it needs from you.
 
 Password SSH remains enabled by default. Switch to key-only SSH explicitly after confirming the key works:
 
@@ -103,7 +91,6 @@ Available options:
 --only tailscale
 --only terminal
 --only ai
---only 1password
 --only configs
 --only services
 --only adguard
@@ -148,7 +135,7 @@ devbox db                     # choose databases interactively
 devbox vm                     # interactive: install, or manage the VM
 devbox vm install             # Windows VM in Docker (dockurr/windows)
 devbox vm launch              # start the VM and print connection details
-devbox install adguard        # optional components: adguard, tailscale, 1password, all
+devbox install adguard        # optional components: adguard, tailscale, all
 devbox remove tailscale       # remove optional components
 devbox update                 # fetch the latest DevBox and update everything
 devbox help                   # what each command does and what it needs from you
@@ -212,12 +199,11 @@ curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh 
 ```
 
 Updates preserve existing shell/editor configuration and onboarding state such
-as Git identity, GitHub authentication, Tailscale enrollment, SSH keys, and
-1Password. An update refreshes only the tmux and starship configuration from
+as Git identity, GitHub authentication, Tailscale enrollment, and SSH keys.
+An update refreshes only the tmux and starship configuration from
 fresh Omadots (with timestamped backups of your current files); everything
 else stays as you left it. An explicit `--only configs` run replaces the full
-managed configuration and creates timestamped backups, and carries over a
-persisted 1Password service token. DevBox records one-time update migrations
+managed configuration and creates timestamped backups. DevBox records one-time update migrations
 under `~/.local/state/devbox/migrations`, so new releases can change only the
 files or settings that actually need changing.
 
@@ -228,7 +214,7 @@ DevBox follows the same setup order as Omaterm:
 1. Install the native system and development packages.
 2. Install the official Omadots configuration.
 3. Install Omaterm's mise-managed tools.
-4. Configure Git, GitHub, Tailscale, SSH, and 1Password.
+4. Configure Git, GitHub, Tailscale, and SSH.
 5. Start tmux interactively with `t` (or `tdl`) when wanted.
 
 The checked-in tmux configuration mirrors current Omadots. Installation uses fresh upstream Omadots as the authoritative source.
@@ -247,7 +233,7 @@ cx   open Claude Code
 
 ## Security
 
-The installer does not store API keys or tokens. Unattended setup values are read only when explicitly supplied through `DEVBOX_SETUP_*` environment variables. `devbox-setup 1password` validates a service account token and persists it in `~/.config/shell/envs` only after you confirm; `devbox-setup --op` reads a 1Password item while the command runs and stores nothing.
+The installer does not store API keys or tokens. Unattended setup values are read only when explicitly supplied through `DEVBOX_SETUP_*` environment variables.
 
 DevBox creates empty skill roots at `~/.agents/skills`, `~/.claude/skills`,
 `~/.codex/skills`, and `~/.pi/agent/skills`. It does not install skills into

@@ -7,8 +7,8 @@ install_configs() {
 # Updates refresh only the config files that are safe to replace wholesale:
 # tmux and starship, both sourced from fresh upstream Omadots. Everything else
 # stays user-owned. Auth state lives outside these files (GitHub in
-# ~/.config/gh, 1Password in ~/.config/op, Tailscale in /var/lib/tailscale,
-# SSH keys in ~/.ssh), and onboarding is never replayed, so authentication is
+# ~/.config/gh, Tailscale in /var/lib/tailscale, SSH keys in ~/.ssh), and
+# onboarding is never replayed, so authentication is
 # never lost.
 refresh_configs() {
   log "Refreshing managed tmux and starship configuration"
@@ -68,9 +68,7 @@ install_omadots() {
   git_name="$(git config --global --get user.name 2>/dev/null || true)"
   git_email="$(git config --global --get user.email 2>/dev/null || true)"
 
-  # A persisted 1Password service token lives in ~/.config/shell/envs, which
-  # Omadots replaces below. Carry it over so a config refresh never forces
-  # re-authentication.
+  # Preserve legacy user secrets when replacing the containing config file.
   if [[ -f "$HOME/.config/shell/envs" ]]; then
     op_token_line="$(grep '^export OP_SERVICE_ACCOUNT_TOKEN=' "$HOME/.config/shell/envs" || true)"
   fi

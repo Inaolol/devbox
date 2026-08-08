@@ -8,8 +8,8 @@ Usage:
   devbox setup            Run the interactive onboarding (devbox-setup)
   devbox db [db...]       Install or remove development databases
   devbox vm [cmd]         Manage the Windows VM (interactive by default)
-  devbox install [app]    Install adguard, tailscale, 1password, or all
-  devbox remove [app]     Remove adguard, tailscale, or 1password
+  devbox install [app]    Install adguard, tailscale, or all
+  devbox remove [app]     Remove adguard or tailscale
   devbox update           Fetch the latest DevBox and update everything
   devbox help             Explain what each command does and needs from you
 USAGE

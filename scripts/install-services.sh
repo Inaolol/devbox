@@ -43,15 +43,7 @@ install_services() {
     "$target_dir/devbox-setup" ssh --key "$DEVBOX_SETUP_SSH_KEY"
   fi
 
-  if [[ "${DEVBOX_UPDATE:-0}" -eq 0 && -n "${DEVBOX_SETUP_OP_TOKEN:-}" ]]; then
-    "$target_dir/devbox-setup" 1password --service-token "$DEVBOX_SETUP_OP_TOKEN"
-  fi
-
-  if [[ "${DEVBOX_UPDATE:-0}" -eq 0 && -n "${DEVBOX_SETUP_OP:-}" ]]; then
-    "$target_dir/devbox-setup" --op "$DEVBOX_SETUP_OP"
-  fi
-
-  log "Run 'devbox-setup' from a terminal to connect GitHub, Tailscale, SSH, and 1Password."
+  log "Run 'devbox-setup' from a terminal to connect GitHub, Tailscale, and SSH."
   warn "Password SSH remains enabled unless you explicitly run: devbox-setup ssh --key 'PUBLIC_KEY' --disable-password-auth"
 }
 

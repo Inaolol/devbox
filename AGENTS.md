@@ -26,12 +26,10 @@
   `require_non_root`, `detect_supported_os` (Ubuntu 24.04+, Debian 12+,
   amd64/arm64).
 - `scripts/install-*.sh` — one component each: base, docker, tailscale,
-  terminal, ai, 1password, configs, services, adguard. `install-configs.sh`
+  terminal, ai, configs, services, adguard. `install-configs.sh`
   also defines `refresh_configs` (update path) and `install_devbox_editor_configs`.
 - `scripts/devbox-setup` — interactive onboarding for Git, GitHub, Tailscale,
-  SSH, and 1Password. Reads `DEVBOX_SETUP_*` env vars for unattended runs and
-  seeds everything from one 1Password item with `--op ITEM`. See
-  `docs/1password.md`.
+  and SSH. Reads `DEVBOX_SETUP_*` env vars for unattended runs.
 - `scripts/devbox-db` and `scripts/devbox-windows-vm` — standalone helpers for
   the CLI. `devbox-windows-vm` reads `DEVBOX_VM_*` env vars for unattended
   installs (RAM/CORES/DISK/USER/PASS/VERSION).
@@ -44,24 +42,24 @@
 - `migrations/<timestamp>-<name>.sh` — one-time changes run only on update
   (`DEVBOX_UPDATE=1`), executed with `bash`, tracked by a marker file per
   migration at `~/.local/state/devbox/migrations/<name>`.
-- `docs/` — human docs (e.g., `1password.md`).
+- `docs/` — human documentation.
 - `tests/test.sh` — the test suite (see Testing).
 
 # Update semantics
 
 Updates must never destroy user state. The rules:
 
-- Onboarding (Git identity, GitHub auth in `~/.config/gh`, 1Password in
-  `~/.config/op`, Tailscale enrollment, SSH keys) is first-install work and is
+- Onboarding (Git identity, GitHub auth in `~/.config/gh`, Tailscale
+  enrollment, SSH keys) is first-install work and is
   never replayed on update.
 - `refresh_configs` replaces only `~/.config/tmux/tmux.conf` and
   `~/.config/starship.toml` from fresh Omadots, always with a timestamped
   backup and a diff of the changes. Everything else stays user-owned.
 - `install_omadots` (the `--only configs` force-replace path) preserves Git
-  identity and a persisted `OP_SERVICE_ACCOUNT_TOKEN` in
-  `~/.config/shell/envs`; carry those over when touching that code.
+  identity and legacy user secrets in `~/.config/shell/envs`; carry those over
+  when touching that code.
 - Auth state and secrets live outside omadots-managed files
-  (`~/.config/gh/hosts.yml`, `~/.config/op/`, `/var/lib/tailscale`,
+  (`~/.config/gh/hosts.yml`, `/var/lib/tailscale`,
   `~/.ssh/`). Keep it that way.
 - New packages or file changes that must reach existing installs go in a
   migration, not by re-running the first-install path.

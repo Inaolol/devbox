@@ -19,8 +19,10 @@ fi
 grep -q 'set -Eeuo pipefail' "$ROOT/install.sh"
 grep -q 'require_supported_os' "$ROOT/install.sh"
 grep -q 'run_component services install_services' "$ROOT/install.sh"
-grep -q 'run_component 1password install_1password' "$ROOT/install.sh"
-grep -q '1password' "$ROOT/install.sh"
+if grep -qi '1password' "$ROOT/install.sh"; then
+  echo "1Password must not be installed or managed by DevBox" >&2
+  exit 1
+fi
 grep -q 'run_component configs refresh_configs' "$ROOT/install.sh"
 grep -q '.local/state/devbox' "$ROOT/install.sh"
 grep -q 'run_migrations' "$ROOT/install.sh"
@@ -170,29 +172,10 @@ grep -q -- '--with-adguard' "$ROOT/install.sh"
 grep -q 'adguard/adguardhome' "$ROOT/scripts/install-adguard.sh"
 grep -q '53:53' "$ROOT/scripts/install-adguard.sh"
 
-# 1Password CLI component: official apt repo, CLI package, and setup hint.
-grep -q '1password-cli' "$ROOT/scripts/install-1password.sh"
-grep -q 'downloads.1password.com' "$ROOT/scripts/install-1password.sh"
-grep -q 'devbox-setup 1password' "$ROOT/scripts/install-1password.sh"
-grep -q '1password.asc' "$ROOT/scripts/install-1password.sh"
-grep -q 'repair_1password_apt_key' "$ROOT/install.sh"
-grep -q '\[\[ -f /etc/apt/sources.list.d/1password.list \]\] || return 0' "$ROOT/scripts/install-1password.sh"
-
-# devbox-setup: 1Password auth, --op item seeding, and the Tailscale hint.
-grep -q -- '--op ITEM' "$ROOT/scripts/devbox-setup"
-grep -q 'setup_from_op' "$ROOT/scripts/devbox-setup"
-grep -q 'op item get' "$ROOT/scripts/devbox-setup"
-grep -q 'git-name' "$ROOT/scripts/devbox-setup"
-grep -q 'gh-token' "$ROOT/scripts/devbox-setup"
-grep -q 'OP_SERVICE_ACCOUNT_TOKEN' "$ROOT/scripts/devbox-setup"
-grep -q 'devbox-setup 1password' "$ROOT/scripts/devbox-setup"
-grep -q '1Password rejected the service token' "$ROOT/scripts/devbox-setup"
 grep -q 'sudo tailscale up' "$ROOT/scripts/devbox-setup"
 
-# Services installs the devbox CLI, devbox-db, and the 1Password env hooks.
+# Services installs the devbox CLI and devbox-db.
 grep -q 'devbox-db' "$ROOT/scripts/install-services.sh"
-grep -q 'DEVBOX_SETUP_OP_TOKEN' "$ROOT/scripts/install-services.sh"
-grep -q -- '--op' "$ROOT/scripts/install-services.sh"
 grep -q 'install_devbox_cli' "$ROOT/scripts/install-services.sh"
 grep -q 'DEVBOX_PATH' "$ROOT/scripts/install-services.sh"
 
@@ -203,7 +186,7 @@ grep -q 'refresh_configs' "$ROOT/scripts/install-configs.sh"
 grep -q 'refresh_managed_file' "$ROOT/scripts/install-configs.sh"
 # Refresh shows the diff between the backup and the new config, omarchy-style.
 grep -q 'diff -u' "$ROOT/scripts/install-configs.sh"
-# Update refresh must preserve a persisted 1Password service token.
+# Force-replacing configs must preserve a legacy user secret.
 grep -q 'OP_SERVICE_ACCOUNT_TOKEN' "$ROOT/scripts/install-configs.sh"
 test -f "$ROOT/configs/nvim/plugins/colorscheme.lua"
 test -f "$ROOT/configs/nvim/plugins/disable-news-alert.lua"
@@ -229,7 +212,6 @@ grep -q 'gum choose' "$ROOT/bin/devbox-sub/menu.sh"
 grep -q -- '--only adguard' "$ROOT/bin/devbox-sub/install.sh"
 grep -q 'tailscaled' "$ROOT/bin/devbox-sub/remove.sh"
 grep -q 'bootstrap.sh' "$ROOT/bin/devbox-sub/update.sh"
-grep -q 'docs/1password.md' "$ROOT/bin/devbox-sub/help.sh"
 
 # Windows VM: dockurr/windows compose file, KVM check, localhost-only ports,
 # env-var overrides for unattended installs, and the SSH tunnel hint.

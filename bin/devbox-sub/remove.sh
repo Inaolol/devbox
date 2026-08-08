@@ -7,15 +7,13 @@ if [[ -z "$app" ]]; then
   choice="$(gum choose \
     "AdGuard Home   Stop and remove the ad blocker containers" \
     "Tailscale      Remove Tailscale from this server" \
-    "1Password CLI  Uninstall op and its apt repository" \
     "<< Back        " \
-    --height 6 --header "Remove optional components")" || exit 0
+    --height 5 --header "Remove optional components")" || exit 0
 
   case "$choice" in
     ""|"<< Back"*) exit 0 ;;
     "AdGuard Home"*) app="adguard" ;;
     "Tailscale"*) app="tailscale" ;;
-    "1Password CLI"*) app="1password" ;;
   esac
 fi
 
@@ -38,15 +36,9 @@ case "$app" in
     sudo apt-get purge -y tailscale
     echo "Tailscale removed."
     ;;
-  1password|1password-cli|op)
-    sudo apt-get purge -y 1password-cli
-    sudo rm -f /etc/apt/sources.list.d/1password.list /etc/apt/keyrings/1password.asc
-    sudo apt-get update
-    echo "1Password CLI removed."
-    ;;
   *)
     echo "devbox remove: unknown component '$app'" >&2
-    echo "Try: adguard, tailscale, 1password" >&2
+    echo "Try: adguard, tailscale" >&2
     exit 2
     ;;
 esac

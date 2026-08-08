@@ -9,8 +9,8 @@ Run `devbox` to open the interactive menu, or call a command directly:
   devbox setup            Run the interactive onboarding
   devbox db [db...]       Install or remove development databases
   devbox vm [cmd]         Manage the Windows VM (interactive by default)
-  devbox install [app]    Install adguard, tailscale, 1password, or all
-  devbox remove [app]     Remove adguard, tailscale, or 1password
+  devbox install [app]    Install adguard, tailscale, or all
+  devbox remove [app]     Remove adguard or tailscale
   devbox update           Fetch the latest DevBox and update everything
   devbox help             This page
 
@@ -37,23 +37,6 @@ Onboarding runs each service and asks what it needs from you:
              appended to ~/.ssh/authorized_keys for regular OpenSSH
              logins. Add --disable-password-auth to switch to key-only
              authentication once the key is confirmed working.
-
-  1password  Needs either a 1Password service account token (ops_...,
-             created at 1Password.com under Developer → Service
-             Accounts) or your account details (sign-in address, email,
-             secret key, password). DevBox validates the token and can
-             persist it in ~/.config/shell/envs on request. See
-             docs/1password.md.
-
-Seed everything from one 1Password item:
-
-  devbox-setup --op "DevBox Setup"
-
-  Reads the item (by name, or op://VAULT/ITEM) and applies Git, GitHub,
-  Tailscale, and SSH setup from its fields:
-    git-name, git-email, gh-token, ts-token, ts-host, ssh-key
-  Explicit devbox-setup flags and DEVBOX_SETUP_* variables win over
-  item fields.
 
 ------------------------------------------------------------------
 Databases (devbox db)
@@ -106,7 +89,6 @@ Install and remove (devbox install / devbox remove)
   adguard    AdGuard Home DNS ad blocker in Docker. Needs ports 53 and
              80 free. Finish the first-run wizard at http://<host>:3000.
   tailscale  Mesh VPN / private tailnet.
-  1password  1Password CLI. Enables devbox-setup 1password and --op.
   all        Re-runs every default installer (also: devbox update).
 
 Removing Tailscale cuts this server off your tailnet — if you are

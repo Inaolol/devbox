@@ -6,7 +6,7 @@ command -v devbox-setup >/dev/null 2>&1 || {
   exit 1
 }
 
-echo "DevBox service onboarding — connects Git, GitHub, Tailscale, SSH, and 1Password."
+echo "DevBox service onboarding — connects Git, GitHub, Tailscale, and SSH."
 echo "Each step is optional; press Ctrl+C or answer no to skip the rest."
 echo
 devbox-setup
