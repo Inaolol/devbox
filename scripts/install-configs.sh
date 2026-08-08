@@ -80,6 +80,18 @@ install_omadots() {
   rm -rf "$HOME/.config/nvim/.git"
 
   local upstream_path target
+  # install-ai writes [tools] into ~/.config/mise/config.toml, and users add
+  # their own mise tools there. Omadots' copy would drop that section, so
+  # carry it over into the fresh config.toml.
+  local mise_tools=""
+  if [[ -f "$HOME/.config/mise/config.toml" ]]; then
+    mise_tools="$(awk '
+      /^\[tools\]/ { p=1 }
+      /^\[/ && $0 != "[tools]" && p { exit }
+      p
+    ' "$HOME/.config/mise/config.toml")"
+  fi
+
   mkdir -p "$HOME/.config"
   for upstream_path in "$temp_dir"/omadots/config/*; do
     target="$HOME/.config/$(basename "$upstream_path")"
@@ -96,6 +108,11 @@ install_omadots() {
     "$HOME/.config/shell/devbox-server"
 
   install_devbox_editor_configs
+
+  if [[ -n "$mise_tools" ]] &&
+    ! grep -q '^\[tools\]' "$HOME/.config/mise/config.toml"; then
+    printf '\n%s' "$mise_tools" >> "$HOME/.config/mise/config.toml"
+  fi
 
   ln -snf "$HOME/.config/tmux/tmux.conf" "$HOME/.tmux.conf"
 

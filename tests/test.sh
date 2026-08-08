@@ -189,6 +189,9 @@ grep -q 'refresh_managed_file' "$ROOT/scripts/install-configs.sh"
 grep -q 'diff -u' "$ROOT/scripts/install-configs.sh"
 # Force-replacing configs must preserve a legacy user secret.
 grep -q 'OP_SERVICE_ACCOUNT_TOKEN' "$ROOT/scripts/install-configs.sh"
+# Replacing configs must preserve mise tools installed by install-ai.
+grep -q 'mise_tools' "$ROOT/scripts/install-configs.sh"
+grep -q '^\[tools\]' "$ROOT/scripts/install-configs.sh"
 test -f "$ROOT/configs/nvim/plugins/colorscheme.lua"
 test -f "$ROOT/configs/nvim/plugins/disable-news-alert.lua"
 test -f "$ROOT/configs/nvim/plugins/snacks-animated-scrolling.lua"
