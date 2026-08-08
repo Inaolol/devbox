@@ -175,6 +175,8 @@ grep -q '1password-cli' "$ROOT/scripts/install-1password.sh"
 grep -q 'downloads.1password.com' "$ROOT/scripts/install-1password.sh"
 grep -q 'devbox-setup 1password' "$ROOT/scripts/install-1password.sh"
 grep -q '1password.asc' "$ROOT/scripts/install-1password.sh"
+grep -q 'repair_1password_apt_key' "$ROOT/install.sh"
+grep -q '\[\[ -f /etc/apt/sources.list.d/1password.list \]\] || return 0' "$ROOT/scripts/install-1password.sh"
 
 # devbox-setup: 1Password auth, --op item seeding, and the Tailscale hint.
 grep -q -- '--op ITEM' "$ROOT/scripts/devbox-setup"

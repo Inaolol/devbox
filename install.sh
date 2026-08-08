@@ -70,6 +70,8 @@ source "$REPO_ROOT/scripts/install-services.sh"
 source "$REPO_ROOT/scripts/install-adguard.sh"
 source "$REPO_ROOT/scripts/migrations.sh"
 
+repair_1password_apt_key
+
 if [[ "$DEVBOX_UPDATE" -eq 1 && -z "$ONLY" ]]; then
   run_migrations
 fi
