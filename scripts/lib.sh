@@ -16,6 +16,10 @@ run() {
     return $?
   fi
 
+  if [[ $1 == "sudo" ]]; then
+    sudo -v
+  fi
+
   if [[ ! -f "$log_file" ]]; then
     mkdir -p "$(dirname "$log_file")"
     : >"$log_file"
@@ -36,8 +40,11 @@ run() {
     spinner_pid=$!
   fi
 
-  "$@" >>"$log_file" 2>&1
-  status=$?
+  if "$@" >>"$log_file" 2>&1; then
+    status=0
+  else
+    status=$?
+  fi
 
   if [[ -n "${spinner_pid:-}" ]]; then
     kill "$spinner_pid" 2>/dev/null || true

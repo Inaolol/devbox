@@ -50,6 +50,8 @@ grep -q '=== Devbox install FAILED' "$ROOT/scripts/lib.sh"
 grep -q 'Last output' "$ROOT/scripts/lib.sh"
 grep -q "✓" "$ROOT/scripts/lib.sh"
 grep -q "✗" "$ROOT/scripts/lib.sh"
+# Failed and interrupted commands must reach the spinner cleanup under set -e.
+grep -q 'if "\$@" >>"\$log_file" 2>&1; then' "$ROOT/scripts/lib.sh"
 grep -q 'install_start_log' "$ROOT/install.sh"
 grep -q 'DEVBOX_INSTALL_LOG_FILE' "$ROOT/install.sh"
 grep -q "run bash \"\$migration\"" "$ROOT/scripts/migrations.sh"
@@ -70,6 +72,26 @@ grep -q "run bash \"\$migration\"" "$ROOT/scripts/migrations.sh"
   install_end_log
   grep -q '=== Devbox install started:' "$work/install.log"
   grep -q '=== Devbox install completed:' "$work/install.log"
+)
+# Sudo must authenticate before the command is hidden behind progress output.
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  # shellcheck disable=SC2030,SC2031
+  export DEVBOX_INSTALL_LOG_FILE="$work/install.log"
+  # shellcheck disable=SC2030,SC2031
+  export DRY_RUN=0
+  authenticated=0
+  sudo() {
+    if [[ $1 == "-v" ]]; then
+      authenticated=1
+      return 0
+    fi
+    (( authenticated == 1 )) || return 42
+    "$@"
+  }
+  source "$ROOT/scripts/lib.sh"
+  run sudo true >/dev/null 2>&1
 )
 grep -q 'docker-ce' "$ROOT/scripts/install-docker.sh"
 grep -q 'podman-docker' "$ROOT/scripts/install-docker.sh"
