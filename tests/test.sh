@@ -158,6 +158,7 @@ grep -q 'git config --file "$HOME/.gitconfig" user.email' "$ROOT/scripts/install
 grep -q 'tmux-free' "$ROOT/scripts/install-configs.sh"
 grep -q 'Git identity is already configured' "$ROOT/scripts/devbox-setup"
 grep -q 'GitHub is already authenticated' "$ROOT/scripts/devbox-setup"
+grep -q 'gh auth login --hostname github.com --git-protocol https --web </dev/null' "$ROOT/scripts/devbox-setup"
 grep -q 'Tailscale is already connected' "$ROOT/scripts/devbox-setup"
 grep -q 'An SSH public key is already installed' "$ROOT/scripts/devbox-setup"
 grep -q "alias lzd='lazydocker'" "$ROOT/configs/shell/devbox-server"

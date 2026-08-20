@@ -83,7 +83,7 @@ setup_github() {
     gh auth login --hostname github.com --git-protocol https --with-token
   else
     [[ -t 0 || -r /dev/tty ]] || die "run this command from a terminal, or pipe a token to: devbox-setup github --with-token"
-    gh auth login --hostname github.com --git-protocol https --web
+    gh auth login --hostname github.com --git-protocol https --web </dev/null
   fi
   gh auth setup-git
   echo "✓ GitHub authentication configured"
