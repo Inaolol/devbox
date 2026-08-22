@@ -11,15 +11,16 @@ install_terminal() {
   mkdir -p "$HOME/.local/bin"
   install_neovim
 
-  if [[ ! -e "$HOME/.local/bin/fd" ]] && command -v fdfind >/dev/null 2>&1; then
+  # -L guards against a stale symlink left behind by a failed earlier run.
+  if [[ ! -e "$HOME/.local/bin/fd" && ! -L "$HOME/.local/bin/fd" ]] && command -v fdfind >/dev/null 2>&1; then
     run ln -s "$(command -v fdfind)" "$HOME/.local/bin/fd"
   fi
-  if [[ ! -e "$HOME/.local/bin/bat" ]] && command -v batcat >/dev/null 2>&1; then
+  if [[ ! -e "$HOME/.local/bin/bat" && ! -L "$HOME/.local/bin/bat" ]] && command -v batcat >/dev/null 2>&1; then
     run ln -s "$(command -v batcat)" "$HOME/.local/bin/bat"
   fi
 
   if ! command -v starship >/dev/null 2>&1; then
-    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install Starship"; else curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"; fi
+    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install Starship"; else curl -fsSL https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"; fi
   fi
 
   if ! command -v zoxide >/dev/null 2>&1; then
@@ -27,7 +28,7 @@ install_terminal() {
   fi
 
   if ! command -v mise >/dev/null 2>&1; then
-    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install mise"; else curl https://mise.run | sh; fi
+    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install mise"; else curl -fsSL https://mise.run | sh; fi
   fi
 
   install_eza

@@ -17,10 +17,9 @@
 # Layout
 
 - `install.sh` — the entry point. Parses flags, detects first install vs
-  update (`DEVBOX_UPDATE=1` when `~/.local/state/devbox/installed` or
-  `~/.config/shell/devbox-server` exists), then runs components through
-  `run_component NAME function`. Sourced component scripts define the
-  `install_*` functions.
+  update (`DEVBOX_UPDATE=1` when `~/.local/state/devbox/installed` exists),
+  then runs components through `run_component NAME function`. Sourced
+  component scripts define the `install_*` functions.
 - `scripts/lib.sh` — shared helpers: `log`, `warn`, `run` (DRY_RUN-aware),
   `backup_path` (timestamped backups), `install_apt_packages`,
   `require_non_root`, `detect_supported_os` (Ubuntu 24.04+, Debian 12+,

@@ -22,7 +22,9 @@ run() {
 
   if [[ ! -f "$log_file" ]]; then
     mkdir -p "$(dirname "$log_file")"
-    : >"$log_file"
+    # The log captures command output that may be sensitive; keep it
+    # readable by the owning user only.
+    ( umask 077; : >"$log_file" )
   fi
 
   local cmd_display="$*"
@@ -104,7 +106,9 @@ install_end_log() {
 install_fail_log() {
   local log_file="${DEVBOX_INSTALL_LOG_FILE:-}"
   [[ -n "$log_file" ]] || return 0
+  local status="${1:-unknown}" command="${2:-}"
   printf '=== Devbox install FAILED at %s ===\n' "$(date '+%Y-%m-%d %H:%M:%S')" >>"$log_file"
+  [[ -z "$command" ]] || printf 'Failed command: %s\n' "$command" >>"$log_file"
 }
 
 require_non_root() {

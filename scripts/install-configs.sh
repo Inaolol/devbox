@@ -1,4 +1,22 @@
 #!/usr/bin/env bash
+# Pinned upstream revisions. Omadots shell files are sourced by every login
+# shell, so upstream changes must land deliberately: bump the SHA, review the
+# diff, commit. Get the current HEAD with:
+#   git ls-remote https://github.com/omacom-io/omadots.git HEAD
+OMADOTS_REF="556354683664f4143776296d76df75c0fa29059a"
+LAZYVIM_STARTER_REF="803bc181d7c0d6d5eeba9274d9be49b287294d99"
+
+clone_pinned() {
+  local repo="$1" ref="$2" target="$3"
+  git clone --depth 1 "$repo" "$target"
+  git -C "$target" fetch --depth 1 origin "$ref"
+  git -C "$target" checkout --quiet --force FETCH_HEAD
+  if [[ "$(git -C "$target" rev-parse HEAD)" != "$ref" ]]; then
+    echo "Pinned checkout mismatch for $repo: expected $ref, got $(git -C "$target" rev-parse HEAD)" >&2
+    return 1
+  fi
+}
+
 install_configs() {
   log "Installing Omaterm-compatible shell, tmux, and LazyVim configuration"
   install_omadots
@@ -21,7 +39,7 @@ refresh_configs() {
 
   temp_dir="$(mktemp -d)"
   trap 'rm -rf "$temp_dir"' RETURN
-  git clone --depth 1 https://github.com/omacom-io/omadots.git "$temp_dir/omadots"
+  clone_pinned https://github.com/omacom-io/omadots.git "$OMADOTS_REF" "$temp_dir/omadots"
 
   refresh_managed_file "$HOME/.config/tmux/tmux.conf" "$temp_dir/omadots/config/tmux/tmux.conf"
   refresh_managed_file "$HOME/.config/starship.toml" "$temp_dir/omadots/config/starship.toml"
@@ -61,7 +79,7 @@ install_omadots() {
 
   temp_dir="$(mktemp -d)"
   trap 'rm -rf "$temp_dir"' RETURN
-  git clone --depth 1 https://github.com/omacom-io/omadots.git "$temp_dir/omadots"
+  clone_pinned https://github.com/omacom-io/omadots.git "$OMADOTS_REF" "$temp_dir/omadots"
 
   # Git may store global identity in ~/.config/git/config, which Omadots
   # replaces below. Keep the machine-specific identity across updates.
@@ -76,7 +94,7 @@ install_omadots() {
   if [[ -e "$HOME/.config/nvim" ]]; then
     backup_path "$HOME/.config/nvim"
   fi
-  git clone --depth 1 https://github.com/LazyVim/starter "$HOME/.config/nvim"
+  clone_pinned https://github.com/LazyVim/starter.git "$LAZYVIM_STARTER_REF" "$HOME/.config/nvim"
   rm -rf "$HOME/.config/nvim/.git"
 
   local upstream_path target

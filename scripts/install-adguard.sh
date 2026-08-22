@@ -27,8 +27,8 @@ services:
     ports:
       - "53:53/tcp"
       - "53:53/udp"
-      - "80:80/tcp"
-      - "3000:3000/tcp"
+      - "127.0.0.1:80:80/tcp"
+      - "127.0.0.1:3000:3000/tcp"
     volumes:
       - ./work:/opt/adguardhome/work
       - ./conf:/opt/adguardhome/conf
@@ -38,8 +38,11 @@ COMPOSE
 
   log "AdGuard Home is running"
   echo "Web admin:   http://localhost:3000 (first run) then http://localhost"
+  echo "             From another machine, tunnel first:"
+  echo "               ssh -L 3000:127.0.0.1:3000 user@this-host"
   echo "DNS server:  this host on UDP/TCP port 53"
   echo "Manage:      docker compose --project-name $project -f $compose_file up/down/logs"
   echo "Point your router or devices at this host's IP to start blocking ads."
   warn "AdGuard Home binds port 53 and 80 on this host. Ensure no other service already uses them."
+  warn "Docker-published ports bypass UFW; restrict port 53 through the DOCKER-USER chain if needed."
 }

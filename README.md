@@ -106,21 +106,20 @@ curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh 
   bash -s -- --with-adguard
 ```
 
-It runs as a Docker Compose service in `~/adguard/docker-compose.yml` (ports
-53 for DNS and 80/3000 for the web admin). After install, finish the first-run
-setup at `http://<host>:3000`, then point your router or devices at the host's
-IP to block ads network-wide. Manage it with:
+It runs as a Docker Compose service in `~/adguard/docker-compose.yml` (port 53
+for DNS, and 80/3000 for the web admin bound to `127.0.0.1`). After install,
+finish the first-run setup through an SSH tunnel:
+
+```bash
+ssh -L 3000:127.0.0.1:3000 user@your-server
+```
+
+Then open `http://localhost:3000`, and point your router or devices at the
+host's IP to block ads network-wide. Manage it with:
 
 ```bash
 docker compose --project-name devbox-adguard -f ~/adguard/docker-compose.yml up -d
 docker compose --project-name devbox-adguard -f ~/adguard/docker-compose.yml logs -f
-```
-
-Set `DEVBOX_NO_TMUX=1` before starting Bash to skip the auto-attach on hosts
-that were set up before this change (or where you re-enable it):
-
-```bash
-DEVBOX_NO_TMUX=1 bash
 ```
 
 ## DevBox CLI

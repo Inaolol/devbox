@@ -108,8 +108,13 @@ setup_tailscale() {
   valid_hostname "$hostname" || die "invalid Tailscale hostname: $hostname"
 
   local args=(up --ssh --accept-routes "--hostname=$hostname")
-  [[ -z "$auth_key" ]] || args+=("--auth-key=$auth_key")
-  sudo tailscale "${args[@]}"
+  if [[ -z "$auth_key" ]]; then
+    sudo tailscale "${args[@]}"
+  else
+    # Pass the auth key through the environment, never argv: argv is
+    # readable by any local user through ps and /proc/*/cmdline.
+    sudo env TS_AUTHKEY="$auth_key" tailscale "${args[@]}"
+  fi
   echo "✓ Tailscale connected as $hostname with Tailscale SSH enabled"
 }
 

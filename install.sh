@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -f "$INSTALL_MARKER" || -e "$HOME/.config/shell/devbox-server" ]]; then
+if [[ -f "$INSTALL_MARKER" ]]; then
   DEVBOX_UPDATE=1
 else
   DEVBOX_UPDATE=0
@@ -49,7 +49,7 @@ require_non_root
 
 export DEVBOX_INSTALL_LOG_FILE="${DEVBOX_INSTALL_LOG_FILE:-$STATE_DIR/install.log}"
 install_start_log
-trap 'install_fail_log; exit 1' ERR
+trap 'status=$?; install_fail_log "$status" "$BASH_COMMAND"; exit "$status"' ERR
 
 run_component() {
   local name="$1"

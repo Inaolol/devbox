@@ -5,6 +5,17 @@ REPOSITORY="${DEVBOX_REPOSITORY:-https://github.com/Inaolol/devbox.git}"
 REF="${DEVBOX_REF:-master}"
 TARGET="${DEVBOX_DIR:-$HOME/.local/share/devbox}"
 
+if [[ "${EUID}" -eq 0 ]]; then
+  echo "Run this installer as your normal user, not root. It uses sudo when needed." >&2
+  exit 1
+fi
+
+# DEVBOX_DIR is used in an rm -rf below; refuse obviously destructive values.
+if [[ -z "$TARGET" || "$TARGET" == "/" ]]; then
+  echo "Refusing to use unsafe install directory: '$TARGET' (check DEVBOX_DIR)" >&2
+  exit 1
+fi
+
 command -v git >/dev/null 2>&1 || {
   command -v sudo >/dev/null 2>&1 || {
     echo "Git and sudo are required. Install sudo and grant this user sudo access, then rerun." >&2

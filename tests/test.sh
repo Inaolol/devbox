@@ -148,6 +148,14 @@ grep -q '"$HOME/.pi/agent/skills"' "$ROOT/scripts/install-ai.sh"
 grep -q 'set -g prefix C-Space' "$ROOT/configs/tmux.conf"
 grep -q 'prefix2 C-b' "$ROOT/configs/tmux.conf"
 grep -q 'omacom-io/omadots' "$ROOT/scripts/install-configs.sh"
+# Upstream configs are sourced by every login shell; they must stay pinned
+# to full commit SHAs so upstream changes land deliberately.
+grep -qE 'OMADOTS_REF="[0-9a-f]{40}"' "$ROOT/scripts/install-configs.sh"
+grep -qE 'LAZYVIM_STARTER_REF="[0-9a-f]{40}"' "$ROOT/scripts/install-configs.sh"
+grep -q 'clone_pinned https://github.com/omacom-io/omadots.git "\$OMADOTS_REF"' "$ROOT/scripts/install-configs.sh"
+grep -q 'clone_pinned https://github.com/LazyVim/starter.git "\$LAZYVIM_STARTER_REF"' "$ROOT/scripts/install-configs.sh"
+# The pinned checkout must be verified against the expected SHA.
+grep -q 'rev-parse HEAD' "$ROOT/scripts/install-configs.sh"
 # The literal HOME expression must appear in the installer.
 # shellcheck disable=SC2016
 grep -q 'backup_path "$HOME/.bashrc"' "$ROOT/scripts/install-configs.sh"
@@ -173,8 +181,32 @@ grep -q 'not Tailscale SSH' "$ROOT/scripts/devbox-setup"
 grep -q -- '--with-adguard' "$ROOT/install.sh"
 grep -q 'adguard/adguardhome' "$ROOT/scripts/install-adguard.sh"
 grep -q '53:53' "$ROOT/scripts/install-adguard.sh"
+# The AdGuard web admin must not be reachable from the network: only DNS
+# (port 53, the component's purpose) stays published on all interfaces.
+if grep -Eq '"(80|3000):(80|3000)' "$ROOT/scripts/install-adguard.sh"; then
+  echo "AdGuard admin ports must be bound to 127.0.0.1" >&2
+  exit 1
+fi
+grep -q '127.0.0.1:3000:3000' "$ROOT/scripts/install-adguard.sh"
+grep -q '127.0.0.1:80:80' "$ROOT/scripts/install-adguard.sh"
 
 grep -q 'sudo tailscale up' "$ROOT/scripts/devbox-setup"
+
+# The Tailscale auth key must travel through the environment, never argv
+# (argv is readable by any local user via ps and /proc/*/cmdline).
+grep -q 'TS_AUTHKEY' "$ROOT/scripts/devbox-setup"
+if grep -qF -- '--auth-key=$auth_key' "$ROOT/scripts/devbox-setup"; then
+  echo "Tailscale auth key must not be passed as a command argument" >&2
+  exit 1
+fi
+# Secret-bearing env vars must be unset once consumed.
+grep -q 'DEVBOX_SETUP_GH_TOKEN DEVBOX_SETUP_TS_AUTH_KEY' "$ROOT/scripts/install-services.sh"
+# Remote installers must fail on HTTP errors instead of piping error pages
+# into sh, and follow redirects.
+grep -q 'curl -fsSL https://mise.run' "$ROOT/scripts/install-terminal.sh"
+grep -q 'curl -fsSL https://starship.rs/install.sh' "$ROOT/scripts/install-terminal.sh"
+# The bootstrap refuses to run as root before touching the system.
+grep -q 'EUID' "$ROOT/bootstrap.sh"
 
 # Services installs the devbox CLI and devbox-db.
 grep -q 'devbox-db' "$ROOT/scripts/install-services.sh"
@@ -192,7 +224,8 @@ grep -q 'diff -u' "$ROOT/scripts/install-configs.sh"
 grep -q 'OP_SERVICE_ACCOUNT_TOKEN' "$ROOT/scripts/install-configs.sh"
 # Replacing configs must preserve mise tools installed by install-ai.
 grep -q 'mise_tools' "$ROOT/scripts/install-configs.sh"
-grep -q '^\[tools\]' "$ROOT/scripts/install-configs.sh"
+# shellcheck disable=SC2016
+grep -qF '\[tools\]' "$ROOT/scripts/install-configs.sh"
 test -f "$ROOT/configs/nvim/plugins/colorscheme.lua"
 test -f "$ROOT/configs/nvim/plugins/disable-news-alert.lua"
 test -f "$ROOT/configs/nvim/plugins/snacks-animated-scrolling.lua"
@@ -246,6 +279,27 @@ grep -q 'header.sh' "$ROOT/bin/devbox-sub/menu.sh"
 grep -q 'press Enter to return to the menu' "$ROOT/bin/devbox-sub/menu.sh"
 grep -q 'cancel()' "$ROOT/scripts/devbox-windows-vm"
 grep -q "tr ' ' '\\\\n'" "$ROOT/scripts/devbox-windows-vm"
+# The compose file holds the Windows password: user-only permissions and
+# values that cannot inject YAML lines.
+grep -q 'umask 077' "$ROOT/scripts/devbox-windows-vm"
+grep -q 'chmod 600 "$COMPOSE_FILE"' "$ROOT/scripts/devbox-windows-vm"
+grep -q 'yaml_quote' "$ROOT/scripts/devbox-windows-vm"
+# The password must not be printed to the terminal.
+if grep -q 'password \$win_pass' "$ROOT/scripts/devbox-windows-vm"; then
+  echo "devbox vm must not print the Windows password" >&2
+  exit 1
+fi
+# The install log captures command output; it must stay user-readable only.
+grep -q 'umask 077' "$ROOT/scripts/lib.sh"
+# Failures must record the failing command in the install log.
+grep -q 'Failed command' "$ROOT/scripts/lib.sh"
+grep -q 'install_fail_log "\$status" "\$BASH_COMMAND"' "$ROOT/install.sh"
+# Update detection trusts the marker alone; a foreign dotfiles file must
+# never flip a first install into update mode.
+if grep -q 'devbox-server".*DEVBOX_UPDATE\|DEVBOX_UPDATE.*devbox-server' "$ROOT/install.sh"; then
+  echo "Update detection must rely on the installed marker only" >&2
+  exit 1
+fi
 grep -q '|| return 0' "$ROOT/scripts/devbox-db"
 grep -q 'gum_choose DEVBOX_VM_RAM' "$ROOT/scripts/devbox-windows-vm"
 

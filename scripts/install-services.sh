@@ -43,6 +43,12 @@ install_services() {
     "$target_dir/devbox-setup" ssh --key "$DEVBOX_SETUP_SSH_KEY"
   fi
 
+  # Secrets must not linger in the installer's environment, where every
+  # child process (apt, curl, docker) could inherit them.
+  unset DEVBOX_SETUP_GIT_NAME DEVBOX_SETUP_GIT_EMAIL \
+    DEVBOX_SETUP_GH_TOKEN DEVBOX_SETUP_TS_AUTH_KEY DEVBOX_SETUP_TS_HOST \
+    DEVBOX_SETUP_SSH_KEY
+
   log "Run 'devbox-setup' from a terminal to connect GitHub, Tailscale, and SSH."
   warn "Password SSH remains enabled unless you explicitly run: devbox-setup ssh --key 'PUBLIC_KEY' --disable-password-auth"
 }
