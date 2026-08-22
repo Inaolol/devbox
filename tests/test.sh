@@ -9,7 +9,11 @@ bash -n "$ROOT/scripts/devbox-setup" "$ROOT/configs/shell/devbox-server"
 bash -n "$ROOT/bin/devbox" "$ROOT/scripts/devbox-db"
 
 if command -v shellcheck >/dev/null 2>&1; then
-  find "$ROOT" -type f -name '*.sh' -print0 | xargs -0 shellcheck
+  find "$ROOT" -type f -name '*.sh' ! -path "$ROOT/tests/*" -print0 | xargs -0 shellcheck
+  # This file deliberately greps for literal strings containing '$' and
+  # defines stub functions consumed indirectly, so its info-level findings
+  # are expected; hold it to warnings and errors only.
+  shellcheck --severity=warning "$ROOT/tests/test.sh"
   shellcheck "$ROOT/scripts/devbox-setup"
   shellcheck -s bash "$ROOT/configs/shell/devbox-server"
 else
@@ -344,6 +348,8 @@ if OS_RELEASE_FILE="$tmp/debian13" detect_supported_os 2>/dev/null; then
   echo "Unsupported architecture test failed" >&2
   exit 1
 fi
+# Reset for later suites; consumed by detect_supported_os, not this file.
+# shellcheck disable=SC2034
 OS_ARCHITECTURE=amd64
 
 cat > "$tmp/old-debian" <<'OS'
