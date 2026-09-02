@@ -331,6 +331,17 @@ if grep -q 'devbox-server".*DEVBOX_UPDATE\|DEVBOX_UPDATE.*devbox-server' "$ROOT/
   exit 1
 fi
 grep -q '|| return 0' "$ROOT/scripts/devbox-db"
+# An unknown --only component must be rejected before anything runs, so a
+# typo cannot mark a fresh machine as installed and flip it to update mode.
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  if HOME="$work" bash "$ROOT/install.sh" --only servieces >/dev/null 2>&1; then
+    echo "--only must reject unknown components" >&2
+    exit 1
+  fi
+  [[ ! -e "$work/.local/state/devbox/installed" ]]
+)
 grep -q 'gum_choose DEVBOX_VM_RAM' "$ROOT/scripts/devbox-windows-vm"
 
 # Test OS detection independently of the host running the test.

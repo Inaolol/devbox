@@ -36,6 +36,20 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+known_component() {
+  local name
+  for name in base docker tailscale terminal ai configs services adguard; do
+    [[ "$1" == "$name" ]] && return 0
+  done
+  return 1
+}
+
+if [[ -n "$ONLY" ]] && ! known_component "$ONLY"; then
+  echo "Unknown component: $ONLY (expected: base, docker, tailscale, terminal, ai, configs, services, adguard)" >&2
+  usage >&2
+  exit 2
+fi
+
 if [[ -f "$INSTALL_MARKER" ]]; then
   DEVBOX_UPDATE=1
 else
