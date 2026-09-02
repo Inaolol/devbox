@@ -356,7 +356,7 @@ grep -q 'TZ: $(yaml_quote' "$ROOT/scripts/devbox-windows-vm"
 # containing quotes or backslashes display as entered.
 grep -qF 's/\\\\/\x01/g' "$ROOT/scripts/devbox-windows-vm"
 (
-  unquote() { sed 's/.*"\(.*\)"$/\1/; s/\\\\/\x01/g; s/\\"/"/g; s/\x01/\\/g'; }
+  unquote() { sed 's/^[^"]*"\(.*\)"$/\1/; s/\\\\/\x01/g; s/\\"/"/g; s/\x01/\\/g'; }
   [[ "$(printf '      USERNAME: "dev\\"box"\n' | unquote)" == 'dev"box' ]]
   [[ "$(printf '      USERNAME: "a\\\\b"\n' | unquote)" == 'a\b' ]]
   [[ "$(printf '      USERNAME: "devbox"\n' | unquote)" == 'devbox' ]]

@@ -242,7 +242,7 @@ launch_vm() {
   # Reverse yaml_quote's escaping so a username containing quotes or
   # backslashes is displayed as entered.
   win_user=$(grep '^      USERNAME:' "$COMPOSE_FILE" |
-    sed 's/.*"\(.*\)"$/\1/; s/\\\\/\x01/g; s/\\"/"/g; s/\x01/\\/g')
+    sed 's/^[^"]*"\(.*\)"$/\1/; s/\\\\/\x01/g; s/\\"/"/g; s/\x01/\\/g')
   [[ -n "$win_user" ]] || win_user="devbox"
   if [[ "${1:-}" == "--keep-alive" || "${1:-}" == "-k" ]]; then
     keep_alive=1
