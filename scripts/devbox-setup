@@ -111,8 +111,11 @@ setup_tailscale() {
   if [[ -z "$auth_key" ]]; then
     sudo tailscale "${args[@]}"
   else
-    # Pass the auth key through the environment, never argv: argv is
-    # readable by any local user through ps and /proc/*/cmdline.
+    # Pass the auth key through the environment, never as a tailscale
+    # argument: the long-running tailscale process's argv is readable by
+    # any local user through ps and /proc/*/cmdline. (sudo's own argv
+    # carries the assignment only until it execs tailscale; `tailscale up`
+    # has no stdin interface for keys.)
     sudo env TS_AUTHKEY="$auth_key" tailscale "${args[@]}"
   fi
   echo "✓ Tailscale connected as $hostname with Tailscale SSH enabled"
