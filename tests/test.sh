@@ -122,6 +122,21 @@ fi
 # The literal release URL placeholders must appear in the installer.
 # shellcheck disable=SC2016
 grep -q 'lazygit_${version}_linux_${arch}.tar.gz' "$ROOT/scripts/install-terminal.sh"
+# The latest-release lookup must fail clearly on rate limits and empty
+# responses instead of flowing the literal tag "null" into download URLs.
+grep -q '.tag_name // empty' "$ROOT/scripts/install-terminal.sh"
+grep -q 'Could not determine the latest release tag' "$ROOT/scripts/install-terminal.sh"
+(
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/install-terminal.sh"
+  curl() { printf '%s' '{"message":"API rate limit exceeded"}'; }
+  if latest_github_release_tag eza-community/eza >/dev/null 2>&1; then
+    echo "latest_github_release_tag must fail on a rate-limited response" >&2
+    exit 1
+  fi
+  curl() { printf '%s' '{"tag_name":"v0.21.4"}'; }
+  [[ "$(latest_github_release_tag eza-community/eza)" == "v0.21.4" ]]
+)
 grep -q 'aqua:modem-dev/hunk' "$ROOT/scripts/install-ai.sh"
 grep -q 'antigravity-cli' "$ROOT/scripts/install-ai.sh"
 if grep -q 'gemini' "$ROOT/scripts/install-ai.sh"; then

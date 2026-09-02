@@ -94,7 +94,16 @@ install_github_cli() {
 }
 
 latest_github_release_tag() {
-  curl -fsSL "https://api.github.com/repos/$1/releases/latest" | jq -r .tag_name
+  local tag
+  tag="$(curl -fsSL --max-time 30 --retry 3 "https://api.github.com/repos/$1/releases/latest" |
+    jq -r '.tag_name // empty')"
+  # A rate-limited or malformed response would otherwise flow into download
+  # URLs as the literal tag "null" and fail with a confusing error.
+  if [[ ! "$tag" =~ ^v?[0-9] ]]; then
+    echo "Could not determine the latest release tag for $1" >&2
+    return 1
+  fi
+  printf '%s' "$tag"
 }
 
 install_eza() {
