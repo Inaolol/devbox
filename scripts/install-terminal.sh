@@ -23,12 +23,22 @@ install_terminal() {
     if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install Starship"; else curl -fsSL https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"; fi
   fi
 
-  if ! command -v zoxide >/dev/null 2>&1; then
-    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install zoxide"; else curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh; fi
+  local mise_bin="$HOME/.local/bin/mise"
+  [[ -x "$mise_bin" ]] || mise_bin="$(command -v mise || true)"
+  if [[ -z "$mise_bin" ]]; then
+    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
+      mise_bin="$HOME/.local/bin/mise"
+    else
+      curl -fsSL https://mise.run | sh
+      mise_bin="$HOME/.local/bin/mise"
+    fi
   fi
 
-  if ! command -v mise >/dev/null 2>&1; then
-    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install mise"; else curl -fsSL https://mise.run | sh; fi
+  # mise is activated by Omadots' shell inits, so mise-managed tools reach
+  # PATH. Installing zoxide through mise keeps it pinned to the mise
+  # registry instead of an install.sh from the project's default branch.
+  if ! command -v zoxide >/dev/null 2>&1; then
+    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install zoxide through mise"; else run "$mise_bin" use --global --yes zoxide; fi
   fi
 
   install_eza

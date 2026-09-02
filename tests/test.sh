@@ -112,6 +112,13 @@ grep -q 'command -v batcat' "$ROOT/scripts/install-terminal.sh"
 grep -q 'install_eza' "$ROOT/scripts/install-terminal.sh"
 grep -q 'install_gum' "$ROOT/scripts/install-terminal.sh"
 grep -q 'kitty-terminfo' "$ROOT/scripts/install-terminal.sh"
+# zoxide must come from the pinned mise registry, not an unpinned install.sh
+# from the project's default branch.
+grep -q '"$mise_bin" use --global --yes zoxide' "$ROOT/scripts/install-terminal.sh"
+if grep -q 'ajeetdsouza/zoxide' "$ROOT/scripts/install-terminal.sh"; then
+  echo "zoxide must not be installed from an unpinned remote script" >&2
+  exit 1
+fi
 # The literal release URL placeholders must appear in the installer.
 # shellcheck disable=SC2016
 grep -q 'lazygit_${version}_linux_${arch}.tar.gz' "$ROOT/scripts/install-terminal.sh"
