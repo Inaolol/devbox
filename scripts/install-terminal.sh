@@ -27,7 +27,7 @@ install_terminal() {
   [[ -x "$mise_bin" ]] || mise_bin="$(command -v mise || true)"
   if [[ -z "$mise_bin" ]]; then
     if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-      mise_bin="$HOME/.local/bin/mise"
+      echo "+ install mise"
     else
       curl -fsSL https://mise.run | sh
       mise_bin="$HOME/.local/bin/mise"

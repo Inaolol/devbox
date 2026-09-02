@@ -36,16 +36,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+DEVBOX_COMPONENTS=(base docker tailscale terminal ai configs services adguard)
+
 known_component() {
   local name
-  for name in base docker tailscale terminal ai configs services adguard; do
+  for name in "${DEVBOX_COMPONENTS[@]}"; do
     [[ "$1" == "$name" ]] && return 0
   done
   return 1
 }
 
 if [[ -n "$ONLY" ]] && ! known_component "$ONLY"; then
-  echo "Unknown component: $ONLY (expected: base, docker, tailscale, terminal, ai, configs, services, adguard)" >&2
+  echo "Unknown component: $ONLY (expected: ${DEVBOX_COMPONENTS[*]})" >&2
   usage >&2
   exit 2
 fi
