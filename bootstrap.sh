@@ -10,7 +10,7 @@ if [[ "${EUID}" -eq 0 ]]; then
   exit 1
 fi
 
-# DEVBOX_DIR is used in an rm -rf below; refuse obviously destructive values.
+# DEVBOX_DIR names where the checkout lives; refuse obviously unsafe values.
 if [[ -z "$TARGET" || "$TARGET" == "/" ]]; then
   echo "Refusing to use unsafe install directory: '$TARGET' (check DEVBOX_DIR)" >&2
   exit 1
@@ -28,8 +28,13 @@ command -v git >/dev/null 2>&1 || {
 if [[ -d "$TARGET/.git" ]]; then
   git -C "$TARGET" fetch --depth 1 origin "$REF"
   git -C "$TARGET" checkout --force FETCH_HEAD
+elif [[ -d "$TARGET" && -n "$(ls -A "$TARGET" 2>/dev/null)" ]]; then
+  # Updates must never destroy user state: a non-empty directory that is
+  # not the devbox checkout belongs to something else.
+  echo "Refusing to replace '$TARGET': it exists and is not a devbox checkout." >&2
+  echo "Remove it or point DEVBOX_DIR elsewhere, then rerun." >&2
+  exit 1
 else
-  rm -rf "$TARGET"
   git clone --depth 1 --branch "$REF" "$REPOSITORY" "$TARGET"
 fi
 

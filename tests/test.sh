@@ -233,6 +233,19 @@ grep -q 'curl -fsSL https://mise.run' "$ROOT/scripts/install-terminal.sh"
 grep -q 'curl -fsSL https://starship.rs/install.sh' "$ROOT/scripts/install-terminal.sh"
 # The bootstrap refuses to run as root before touching the system.
 grep -q 'EUID' "$ROOT/bootstrap.sh"
+# bootstrap must refuse to clobber a non-empty directory that is not a
+# devbox checkout instead of removing it.
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  mkdir -p "$work/target"
+  touch "$work/target/keepme"
+  if DEVBOX_DIR="$work/target" bash "$ROOT/bootstrap.sh" >/dev/null 2>&1; then
+    echo "bootstrap must refuse a non-empty non-checkout DEVBOX_DIR" >&2
+    exit 1
+  fi
+  [[ -e "$work/target/keepme" ]]
+)
 
 # Services installs the devbox CLI and devbox-db.
 grep -q 'devbox-db' "$ROOT/scripts/install-services.sh"
