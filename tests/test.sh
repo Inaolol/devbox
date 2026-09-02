@@ -246,6 +246,32 @@ grep -q 'mysql:8.4' "$ROOT/scripts/devbox-db"
 grep -q 'redis:7' "$ROOT/scripts/devbox-db"
 grep -q 'gum choose' "$ROOT/scripts/devbox-db"
 grep -q 'devbox-db remove' "$ROOT/scripts/devbox-db"
+# Menu labels must map explicitly to installable keys: lowercasing produced
+# "postgresql" and "mongodb", which db_name does not recognize, so selecting
+# PostgreSQL or MongoDB in the menu silently did nothing.
+grep -q 'PostgreSQL) db="postgres"' "$ROOT/scripts/devbox-db"
+grep -q 'MongoDB) db="mongo"' "$ROOT/scripts/devbox-db"
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  mkdir -p "$work/bin"
+  cat > "$work/bin/gum" <<'STUB'
+#!/usr/bin/env bash
+[[ "$1" == "choose" ]] && printf '%s\n' "PostgreSQL" "MongoDB"
+STUB
+  cat > "$work/bin/docker" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$1" == "ps" ]]; then exit 0; fi
+printf '%s\n' "$*" >>"$DEVBOX_DB_DOCKER_LOG"
+STUB
+  chmod +x "$work/bin/gum" "$work/bin/docker"
+  sudo() { "$@"; }
+  export -f sudo
+  export DEVBOX_DB_DOCKER_LOG="$work/docker.log"
+  PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-db" >/dev/null
+  grep -q -- '--name postgres18' "$work/docker.log"
+  grep -q -- '--name mongodb' "$work/docker.log"
+)
 
 # The devbox CLI menu and subs.
 grep -q 'DEVBOX_PATH' "$ROOT/bin/devbox"

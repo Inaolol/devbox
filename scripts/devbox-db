@@ -135,10 +135,20 @@ choose_install() {
     gum choose --no-limit --height 8 --header "Select development databases (Docker, localhost only)")" || return 0
   [[ -n "$choices" ]] || return 0
 
-  local db
+  # Menu labels must map explicitly: lowercasing produces "postgresql" and
+  # "mongodb", which db_name and install_db do not recognize.
+  local choice db
   while IFS= read -r choice; do
     [[ -n "$choice" ]] || continue
-    db="$(echo "$choice" | tr '[:upper:]' '[:lower:]')"
+    case "$choice" in
+      MySQL) db="mysql" ;;
+      PostgreSQL) db="postgres" ;;
+      MariaDB) db="mariadb" ;;
+      Redis) db="redis" ;;
+      MongoDB) db="mongo" ;;
+      MSSQL) db="mssql" ;;
+      *) die "unknown selection: $choice" ;;
+    esac
     install_db "$db"
   done <<<"$choices"
 }
