@@ -349,6 +349,18 @@ grep -q "tr ' ' '\\\\n'" "$ROOT/scripts/devbox-windows-vm"
 grep -q 'umask 077' "$ROOT/scripts/devbox-windows-vm"
 grep -q 'chmod 600 "$COMPOSE_FILE"' "$ROOT/scripts/devbox-windows-vm"
 grep -q 'yaml_quote' "$ROOT/scripts/devbox-windows-vm"
+# Every value in the compose file, including the timezone, must pass
+# through yaml_quote.
+grep -q 'TZ: $(yaml_quote' "$ROOT/scripts/devbox-windows-vm"
+# Reading USERNAME back must reverse yaml_quote's escaping so usernames
+# containing quotes or backslashes display as entered.
+grep -qF 's/\\\\/\x01/g' "$ROOT/scripts/devbox-windows-vm"
+(
+  unquote() { sed 's/.*"\(.*\)"$/\1/; s/\\\\/\x01/g; s/\\"/"/g; s/\x01/\\/g'; }
+  [[ "$(printf '      USERNAME: "dev\\"box"\n' | unquote)" == 'dev"box' ]]
+  [[ "$(printf '      USERNAME: "a\\\\b"\n' | unquote)" == 'a\b' ]]
+  [[ "$(printf '      USERNAME: "devbox"\n' | unquote)" == 'devbox' ]]
+)
 # The password must not be printed to the terminal.
 if grep -q 'password \$win_pass' "$ROOT/scripts/devbox-windows-vm"; then
   echo "devbox vm must not print the Windows password" >&2

@@ -201,7 +201,7 @@ services:
       DISK_SIZE: $(yaml_quote "$disk")
       USERNAME: $(yaml_quote "$user")
       PASSWORD: $(yaml_quote "$pass")
-      TZ: "$(timedatectl show -p Timezone --value 2>/dev/null || echo UTC)"
+      TZ: $(yaml_quote "$(timedatectl show -p Timezone --value 2>/dev/null || echo UTC)")
       ARGUMENTS: "-rtc base=localtime,clock=host,driftfix=slew"
     devices:
       - /dev/kvm
@@ -239,7 +239,10 @@ launch_vm() {
   [[ -f "$COMPOSE_FILE" ]] || die "Windows VM is not configured. Run: devbox vm install"
 
   local win_user keep_alive=0
-  win_user=$(grep '^      USERNAME:' "$COMPOSE_FILE" | sed 's/.*"\(.*\)"/\1/')
+  # Reverse yaml_quote's escaping so a username containing quotes or
+  # backslashes is displayed as entered.
+  win_user=$(grep '^      USERNAME:' "$COMPOSE_FILE" |
+    sed 's/.*"\(.*\)"$/\1/; s/\\\\/\x01/g; s/\\"/"/g; s/\x01/\\/g')
   [[ -n "$win_user" ]] || win_user="devbox"
   if [[ "${1:-}" == "--keep-alive" || "${1:-}" == "-k" ]]; then
     keep_alive=1
