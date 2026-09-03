@@ -139,7 +139,9 @@ grep -q 'Could not determine the latest release tag' "$ROOT/scripts/install-term
 )
 grep -q 'aqua:modem-dev/hunk' "$ROOT/scripts/install-ai.sh"
 grep -q 'antigravity-cli' "$ROOT/scripts/install-ai.sh"
-if grep -q 'gemini' "$ROOT/scripts/install-ai.sh"; then
+# Match the tool name as a standalone token: the Antigravity skills path
+# contains ".gemini/" but must not trip this guard.
+if grep -qE '(^|[[:space:]])gemini([[:space:]]|$)' "$ROOT/scripts/install-ai.sh"; then
   echo "Deprecated Gemini CLI should not be installed; Antigravity CLI replaces it" >&2
   exit 1
 fi
@@ -155,6 +157,9 @@ grep -q '"$HOME/.agents/skills"' "$ROOT/scripts/install-ai.sh"
 grep -q '"$HOME/.claude/skills"' "$ROOT/scripts/install-ai.sh"
 # shellcheck disable=SC2016
 grep -q '"$HOME/.codex/skills"' "$ROOT/scripts/install-ai.sh"
+# The Antigravity CLI reads global skills from ~/.gemini/antigravity-cli/skills.
+# shellcheck disable=SC2016
+grep -q '"$HOME/.gemini/antigravity-cli/skills"' "$ROOT/scripts/install-ai.sh"
 # shellcheck disable=SC2016
 grep -q '"$HOME/.pi/agent/skills"' "$ROOT/scripts/install-ai.sh"
 (
@@ -167,6 +172,7 @@ grep -q '"$HOME/.pi/agent/skills"' "$ROOT/scripts/install-ai.sh"
   install_agent_skill_directories
   test -d "$HOME/.claude/skills"
   test -d "$HOME/.codex/skills"
+  test -d "$HOME/.gemini/antigravity-cli/skills"
   test -d "$HOME/.pi/agent/skills"
   test -e "$HOME/.agents/skills/user-skill"
   rm -rf "$HOME"

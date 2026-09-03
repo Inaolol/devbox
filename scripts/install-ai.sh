@@ -29,5 +29,6 @@ install_agent_skill_directories() {
     "$HOME/.agents/skills" \
     "$HOME/.claude/skills" \
     "$HOME/.codex/skills" \
+    "$HOME/.gemini/antigravity-cli/skills" \
     "$HOME/.pi/agent/skills"
 }
