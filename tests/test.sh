@@ -194,8 +194,8 @@ grep -q 'backup_path "$HOME/.bashrc"' "$ROOT/scripts/install-configs.sh"
 # shellcheck disable=SC2016
 grep -q 'git config --file "$HOME/.gitconfig" user.name' "$ROOT/scripts/install-configs.sh"
 # shellcheck disable=SC2016
-grep -q 'git config --file "$HOME/.gitconfig" user.email' "$ROOT/scripts/install-configs.sh"
-grep -q 'tmux-free' "$ROOT/scripts/install-configs.sh"
+grep -q 'DEVBOX_NO_TMUX' "$ROOT/scripts/install-configs.sh"
+grep -q 'tmux new-session -s Work' "$ROOT/scripts/install-configs.sh"
 grep -q 'Git identity is already configured' "$ROOT/scripts/devbox-setup"
 grep -q 'GitHub is already authenticated' "$ROOT/scripts/devbox-setup"
 grep -q 'gh auth login --hostname github.com --git-protocol https --web </dev/null' "$ROOT/scripts/devbox-setup"
@@ -279,6 +279,19 @@ grep -q '#7aa2f7' "$ROOT/configs/lazygit/config.yml"
 grep -q 'showGraph' "$ROOT/configs/lazygit/config.yml"
 grep -q 'lazygit' "$ROOT/migrations/20260805-install-editor-configs.sh"
 grep -q 'colorscheme.lua' "$ROOT/migrations/20260805-install-editor-configs.sh"
+grep -q 'DEVBOX_NO_TMUX' "$ROOT/migrations/20260917-auto-attach-tmux.sh"
+grep -q 'tmux new-session -s Work' "$ROOT/migrations/20260917-auto-attach-tmux.sh"
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  HOME="$work"
+  touch "$HOME/.bashrc"
+  bash "$ROOT/migrations/20260917-auto-attach-tmux.sh"
+  grep -q 'DEVBOX_NO_TMUX' "$HOME/.bashrc"
+  grep -q 'tmux new-session -s Work' "$HOME/.bashrc"
+  bash "$ROOT/migrations/20260917-auto-attach-tmux.sh"
+  (( $(grep -c 'tmux new-session -s Work' "$HOME/.bashrc") == 1 ))
+)
 
 # Dev databases: localhost-only containers for the full dev stack.
 grep -q '127.0.0.1' "$ROOT/scripts/devbox-db"

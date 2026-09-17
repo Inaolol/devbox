@@ -37,9 +37,9 @@ This supports:
 Minimal Debian installations must have `curl` and `sudo` installed first, with
 the user configured for sudo access.
 
-Open a new login session after installation. DevBox leaves the
-shell tmux-free; start tmux yourself with `t` (attaches to or creates the
-shared `Work` session), then use `tdl <ai>` for the dev layout.
+Open a new login session after installation. DevBox attaches interactive
+terminals to the shared `Work` tmux session. Set `DEVBOX_NO_TMUX=1` before
+starting Bash to skip automatic tmux attachment.
 
 ## Setup
 
@@ -214,7 +214,7 @@ DevBox follows the same setup order as Omaterm:
 2. Install the official Omadots configuration.
 3. Install Omaterm's mise-managed tools.
 4. Configure Git, GitHub, Tailscale, and SSH.
-5. Start tmux interactively with `t` (or `tdl`) when wanted.
+5. Enter tmux for interactive terminal work.
 
 The checked-in tmux configuration mirrors current Omadots. Installation uses fresh upstream Omadots as the authoritative source.
 
