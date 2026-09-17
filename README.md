@@ -35,7 +35,10 @@ This supports:
 - amd64 and arm64
 
 Minimal Debian installations must have `curl` and `sudo` installed first, with
-the user configured for sudo access.
+the user configured for sudo access. An SSH key only skips the SSH login
+password: `sudo` still needs this account's password (you will be asked once
+up front), so accounts with no password must set one with `passwd` or allow
+passwordless sudo before installing.
 
 Open a new login session after installation. DevBox attaches interactive
 terminals to the shared `Work` tmux session. Set `DEVBOX_NO_TMUX=1` before

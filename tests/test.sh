@@ -21,7 +21,9 @@ else
 fi
 
 grep -q 'set -Eeuo pipefail' "$ROOT/install.sh"
-grep -q 'require_supported_os' "$ROOT/install.sh"
+grep -q 'detect_supported_os' "$ROOT/install.sh"
+grep -q 'require_sudo' "$ROOT/install.sh"
+grep -q 'require_sudo' "$ROOT/scripts/lib.sh"
 grep -q 'run_component services install_services' "$ROOT/install.sh"
 if grep -qi '1password' "$ROOT/install.sh"; then
   echo "1Password must not be installed or managed by DevBox" >&2
@@ -98,6 +100,40 @@ grep -q "run bash \"\$migration\"" "$ROOT/scripts/migrations.sh"
   }
   source "$ROOT/scripts/lib.sh"
   run sudo true >/dev/null 2>&1
+)
+# require_sudo passes silently with passwordless sudo and prompts once
+# otherwise; an account with no usable sudo must fail fast with guidance
+# instead of hanging on a hidden password prompt mid-install.
+(
+  sudo() { [[ "$1" == "-n" ]]; }
+  export DRY_RUN=0
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/lib.sh"
+  require_sudo
+)
+(
+  calls="$(mktemp)"
+  trap 'rm -f "$calls"' EXIT
+  sudo() {
+    printf '%s\n' "$1" >>"$calls"
+    [[ "$1" == "-n" ]] && return 1
+    return 0
+  }
+  export DRY_RUN=0
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/lib.sh"
+  require_sudo 2>/dev/null
+  grep -qx -- "-v" "$calls"
+)
+(
+  sudo() { return 1; }
+  export DRY_RUN=0
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/lib.sh"
+  if require_sudo 2>/dev/null; then
+    echo "require_sudo must fail when sudo authentication fails" >&2
+    exit 1
+  fi
 )
 grep -q 'docker-ce' "$ROOT/scripts/install-docker.sh"
 grep -q 'podman-docker' "$ROOT/scripts/install-docker.sh"

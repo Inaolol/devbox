@@ -17,6 +17,8 @@ run() {
   fi
 
   if [[ $1 == "sudo" ]]; then
+    # sudo's password prompt must stay on the terminal: everything after this
+    # point is redirected into the install log, where a prompt would hang unseen.
     sudo -v
   fi
 
@@ -116,6 +118,25 @@ require_non_root() {
     echo "Run this installer as your normal user, not root. It uses sudo when needed." >&2
     exit 1
   fi
+}
+
+require_sudo() {
+  [[ "${DRY_RUN:-0}" -eq 1 ]] && return 0
+  if sudo -n true 2>/dev/null; then
+    return 0
+  fi
+  cat >&2 <<MSG
+
+DevBox needs sudo for system packages. An SSH key only skips the SSH login
+password; sudo still needs this account's password, which you will be asked
+for once now. If this account has no password, sudo can never succeed: set
+one with 'passwd', or (as root) allow passwordless sudo with
+'echo "$USER ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USER && chmod 440 /etc/sudoers.d/$USER'.
+MSG
+  sudo -v || {
+    echo "Could not authenticate with sudo. Fix sudo access as described above, then rerun." >&2
+    return 1
+  }
 }
 
 detect_supported_os() {

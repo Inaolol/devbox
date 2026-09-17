@@ -22,7 +22,8 @@
   component scripts define the `install_*` functions.
 - `scripts/lib.sh` — shared helpers: `log`, `warn`, `run` (DRY_RUN-aware),
   `backup_path` (timestamped backups), `install_apt_packages`,
-  `require_non_root`, `detect_supported_os` (Ubuntu 24.04+, Debian 12+,
+  `require_non_root`, `require_sudo` (fail-fast sudo preflight; SSH keys do
+  not grant sudo), `detect_supported_os` (Ubuntu 24.04+, Debian 12+,
   amd64/arm64).
 - `scripts/install-*.sh` — one component each: base, docker, tailscale,
   terminal, ai, configs, services, adguard. `install-configs.sh`

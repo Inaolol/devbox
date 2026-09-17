@@ -60,8 +60,10 @@ fi
 
 export REPO_ROOT DRY_RUN DEVBOX_UPDATE
 source "$REPO_ROOT/scripts/lib.sh"
-require_supported_os
+detect_supported_os
+log "Detected $OS_PRETTY_NAME ($OS_ID/$OS_CODENAME)"
 require_non_root
+require_sudo
 
 export DEVBOX_INSTALL_LOG_FILE="${DEVBOX_INSTALL_LOG_FILE:-$STATE_DIR/install.log}"
 install_start_log
