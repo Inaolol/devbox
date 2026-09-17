@@ -41,10 +41,6 @@ die() {
   exit 1
 }
 
-valid_db() {
-  [[ -n "$(db_name "$1")" ]]
-}
-
 db_info() {
   case "$1" in
     mysql) echo "mysql:     127.0.0.1:3306  user root, empty password" ;;
@@ -58,6 +54,16 @@ db_info() {
 
 container_exists() {
   sudo docker ps -a --format '{{.Names}}' | grep -qx "$(db_name "$1")"
+}
+
+installed_dbs() {
+  local running db
+  running="$(sudo docker ps -a --format '{{.Names}}')"
+  for db in mysql postgres mariadb redis mongo mssql; do
+    if printf '%s\n' "$running" | grep -qx "$(db_name "$db")"; then
+      printf '%s\n' "$db"
+    fi
+  done
 }
 
 install_db() {
@@ -108,15 +114,8 @@ remove_db() {
 }
 
 list_dbs() {
-  local running
-  running="$(sudo docker ps -a --format '{{.Names}}')"
-
   local -a installed=()
-  for db in mysql postgres mariadb redis mongo mssql; do
-    if printf '%s\n' "$running" | grep -qx "$(db_name "$db")"; then
-      installed+=("$db")
-    fi
-  done
+  mapfile -t installed < <(installed_dbs)
 
   if ((${#installed[@]} == 0)); then
     echo "No development databases installed. Install one with: devbox-db postgres redis"
@@ -154,15 +153,9 @@ choose_install() {
 }
 
 choose_remove() {
-  local running choices
-  running="$(sudo docker ps -a --format '{{.Names}}')"
-
+  local choices
   local -a installed=()
-  for db in mysql postgres mariadb redis mongo mssql; do
-    if printf '%s\n' "$running" | grep -qx "$(db_name "$db")"; then
-      installed+=("$db")
-    fi
-  done
+  mapfile -t installed < <(installed_dbs)
 
   if ((${#installed[@]} == 0)); then
     echo "No development databases installed."
@@ -189,7 +182,7 @@ case "$command" in
       choose_remove
     else
       for db in "$@"; do
-        valid_db "$db" || die "unknown database: $db"
+        [[ -n "$(db_name "$db")" ]] || die "unknown database: $db"
         remove_db "$db"
       done
     fi
@@ -198,7 +191,7 @@ case "$command" in
   -h|--help|help) usage ;;
   *)
     for db in "$@"; do
-      valid_db "$db" || die "unknown database: $db (see devbox-db help)"
+      [[ -n "$(db_name "$db")" ]] || die "unknown database: $db (see devbox-db help)"
       install_db "$db"
     done
     ;;

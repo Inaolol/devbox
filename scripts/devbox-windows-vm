@@ -97,6 +97,10 @@ yaml_quote() {
   printf '"%s"' "$s"
 }
 
+yaml_unquote() {
+  sed 's/^[^"]*"\(.*\)"$/\1/; s/\\\\/\x01/g; s/\\"/"/g; s/\x01/\\/g'
+}
+
 install_vm() {
   require_compose
   check_prerequisites
@@ -241,8 +245,7 @@ launch_vm() {
   local win_user keep_alive=0
   # Reverse yaml_quote's escaping so a username containing quotes or
   # backslashes is displayed as entered.
-  win_user=$(grep '^      USERNAME:' "$COMPOSE_FILE" |
-    sed 's/^[^"]*"\(.*\)"$/\1/; s/\\\\/\x01/g; s/\\"/"/g; s/\x01/\\/g')
+  win_user=$(grep '^      USERNAME:' "$COMPOSE_FILE" | yaml_unquote)
   [[ -n "$win_user" ]] || win_user="devbox"
   if [[ "${1:-}" == "--keep-alive" || "${1:-}" == "-k" ]]; then
     keep_alive=1
@@ -346,18 +349,24 @@ interactive_vm() {
   esac
 }
 
-case "${1:-}" in
-  install) install_vm "${@:2}" ;;
-  launch|start) launch_vm "${2:-}" ;;
-  stop|down) stop_vm ;;
-  status) status_vm ;;
-  remove) remove_vm ;;
-  help|-h|--help) usage ;;
-  "") interactive_vm ;;
-  *)
-    echo "devbox vm: unknown command '${1}'" >&2
-    echo >&2
-    usage >&2
-    exit 1
-    ;;
-esac
+main() {
+  case "${1:-}" in
+    install) install_vm "${@:2}" ;;
+    launch|start) launch_vm "${2:-}" ;;
+    stop|down) stop_vm ;;
+    status) status_vm ;;
+    remove) remove_vm ;;
+    help|-h|--help) usage ;;
+    "") interactive_vm ;;
+    *)
+      echo "devbox vm: unknown command '${1}'" >&2
+      echo >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

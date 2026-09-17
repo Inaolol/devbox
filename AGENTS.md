@@ -55,7 +55,7 @@ Updates must never destroy user state. The rules:
 - `refresh_configs` replaces only `~/.config/tmux/tmux.conf` and
   `~/.config/starship.toml` from fresh Omadots, always with a timestamped
   backup and a diff of the changes. Everything else stays user-owned.
-- `install_omadots` (the `--only configs` force-replace path) preserves Git
+- `install_configs` (the `--only configs` force-replace path) preserves Git
   identity and legacy user secrets in `~/.config/shell/envs`; carry those over
   when touching that code.
 - Auth state and secrets live outside omadots-managed files

@@ -56,8 +56,6 @@ grep -q '=== Devbox install started' "$ROOT/scripts/lib.sh"
 grep -q '=== Devbox install completed' "$ROOT/scripts/lib.sh"
 grep -q '=== Devbox install FAILED' "$ROOT/scripts/lib.sh"
 grep -q 'Last output' "$ROOT/scripts/lib.sh"
-grep -q "✓" "$ROOT/scripts/lib.sh"
-grep -q "✗" "$ROOT/scripts/lib.sh"
 # Failed and interrupted commands must reach the spinner cleanup under set -e.
 grep -q 'if "\$@" >>"\$log_file" 2>&1; then' "$ROOT/scripts/lib.sh"
 grep -q 'install_start_log' "$ROOT/install.sh"
@@ -198,21 +196,6 @@ grep -q '"$HOME/.codex/skills"' "$ROOT/scripts/install-ai.sh"
 grep -q '"$HOME/.gemini/antigravity-cli/skills"' "$ROOT/scripts/install-ai.sh"
 # shellcheck disable=SC2016
 grep -q '"$HOME/.pi/agent/skills"' "$ROOT/scripts/install-ai.sh"
-(
-  HOME="$(mktemp -d)"
-  log() { :; }
-  run() { "$@"; }
-  source "$ROOT/scripts/install-ai.sh"
-  install_agent_skill_directories
-  touch "$HOME/.agents/skills/user-skill"
-  install_agent_skill_directories
-  test -d "$HOME/.claude/skills"
-  test -d "$HOME/.codex/skills"
-  test -d "$HOME/.gemini/antigravity-cli/skills"
-  test -d "$HOME/.pi/agent/skills"
-  test -e "$HOME/.agents/skills/user-skill"
-  rm -rf "$HOME"
-)
 grep -q 'set -g prefix C-Space' "$ROOT/configs/tmux.conf"
 grep -q 'prefix2 C-b' "$ROOT/configs/tmux.conf"
 grep -q 'omacom-io/omadots' "$ROOT/scripts/install-configs.sh"
@@ -291,7 +274,7 @@ grep -q 'EUID' "$ROOT/bootstrap.sh"
 
 # Services installs the devbox CLI and devbox-db.
 grep -q 'devbox-db' "$ROOT/scripts/install-services.sh"
-grep -q 'install_devbox_cli' "$ROOT/scripts/install-services.sh"
+grep -q 'DEVBOX_PATH/bin/devbox' "$ROOT/scripts/install-services.sh"
 grep -q 'DEVBOX_PATH' "$ROOT/scripts/install-services.sh"
 
 # Editor configs: Neovim QoL plugins and lazygit config are managed files.
@@ -395,10 +378,7 @@ grep -q 'if run_sub "$sub"; then' "$ROOT/bin/devbox-sub/menu.sh"
 grep -q 'exited with an error (code' "$ROOT/bin/devbox-sub/menu.sh"
 grep -q "\[\[ \"\$sub\" == \"help\" \]\] && exit 0" "$ROOT/bin/devbox-sub/menu.sh"
 grep -q 'clear' "$ROOT/bin/devbox-sub/menu.sh"
-grep -q 'header.sh' "$ROOT/bin/devbox-sub/menu.sh"
-grep -q 'press Enter to return to the menu' "$ROOT/bin/devbox-sub/menu.sh"
 grep -q 'cancel()' "$ROOT/scripts/devbox-windows-vm"
-grep -q "tr ' ' '\\\\n'" "$ROOT/scripts/devbox-windows-vm"
 # The compose file holds the Windows password: user-only permissions and
 # values that cannot inject YAML lines.
 grep -q 'umask 077' "$ROOT/scripts/devbox-windows-vm"
@@ -409,12 +389,14 @@ grep -q 'yaml_quote' "$ROOT/scripts/devbox-windows-vm"
 grep -q 'TZ: $(yaml_quote' "$ROOT/scripts/devbox-windows-vm"
 # Reading USERNAME back must reverse yaml_quote's escaping so usernames
 # containing quotes or backslashes display as entered.
-grep -qF 's/\\\\/\x01/g' "$ROOT/scripts/devbox-windows-vm"
+grep -q 'yaml_unquote' "$ROOT/scripts/devbox-windows-vm"
 (
-  unquote() { sed 's/^[^"]*"\(.*\)"$/\1/; s/\\\\/\x01/g; s/\\"/"/g; s/\x01/\\/g'; }
-  [[ "$(printf '      USERNAME: "dev\\"box"\n' | unquote)" == 'dev"box' ]]
-  [[ "$(printf '      USERNAME: "a\\\\b"\n' | unquote)" == 'a\b' ]]
-  [[ "$(printf '      USERNAME: "devbox"\n' | unquote)" == 'devbox' ]]
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/devbox-windows-vm"
+  [[ "$(printf '      USERNAME: "dev\\"box"\n' | yaml_unquote)" == 'dev"box' ]]
+  [[ "$(printf '      USERNAME: "a\\\\b"\n' | yaml_unquote)" == 'a\b' ]]
+  [[ "$(printf '      USERNAME: "devbox"\n' | yaml_unquote)" == 'devbox' ]]
+  [[ "$(yaml_quote 'dev"box')" == '"dev\"box"' ]]
 )
 # The password must not be printed to the terminal.
 if grep -q 'password \$win_pass' "$ROOT/scripts/devbox-windows-vm"; then

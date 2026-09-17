@@ -17,11 +17,6 @@ clone_pinned() {
   fi
 }
 
-install_configs() {
-  log "Installing Omaterm-compatible shell, tmux, and LazyVim configuration"
-  install_omadots
-}
-
 # Updates refresh only the config files that are safe to replace wholesale:
 # tmux and starship, both sourced from fresh upstream Omadots. Everything else
 # stays user-owned. Auth state lives outside these files (GitHub in
@@ -66,7 +61,8 @@ refresh_managed_file() {
   fi
 }
 
-install_omadots() {
+install_configs() {
+  log "Installing Omaterm-compatible shell, tmux, and LazyVim configuration"
   local temp_dir git_name git_email op_token_line=""
 
   if [[ "${DRY_RUN:-0}" -eq 1 ]]; then

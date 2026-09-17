@@ -15,7 +15,13 @@ install_services() {
     return
   fi
 
-  install_devbox_cli "$target_dir"
+  cat > "$target_dir/devbox" <<EOF
+#!/usr/bin/env bash
+export DEVBOX_PATH="$(printf '%q' "$REPO_ROOT")"
+exec "\$DEVBOX_PATH/bin/devbox" "\$@"
+EOF
+  run chmod +x "$target_dir/devbox"
+  log "Installed the devbox CLI. Run 'devbox' to manage components and databases."
 
   # Onboarding is first-install work. Updates refresh this helper without
   # replaying credentials or changing service enrollment.
@@ -51,15 +57,4 @@ install_services() {
 
   log "Run 'devbox-setup' from a terminal to connect GitHub, Tailscale, and SSH."
   warn "Password SSH remains enabled unless you explicitly run: devbox-setup ssh --key 'PUBLIC_KEY' --disable-password-auth"
-}
-
-install_devbox_cli() {
-  local target_dir="$1"
-  cat > "$target_dir/devbox" <<EOF
-#!/usr/bin/env bash
-export DEVBOX_PATH="$(printf '%q' "$REPO_ROOT")"
-exec "\$DEVBOX_PATH/bin/devbox" "\$@"
-EOF
-  run chmod +x "$target_dir/devbox"
-  log "Installed the devbox CLI. Run 'devbox' to manage components and databases."
 }

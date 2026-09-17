@@ -194,11 +194,6 @@ detect_supported_os() {
   export OS_ID OS_CODENAME OS_VERSION_ID OS_PRETTY_NAME OS_ARCHITECTURE
 }
 
-require_supported_os() {
-  detect_supported_os
-  log "Detected $OS_PRETTY_NAME ($OS_ID/$OS_CODENAME)"
-}
-
 backup_path() {
   local path="$1"
   if [[ -e "$path" || -L "$path" ]]; then
