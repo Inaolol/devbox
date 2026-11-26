@@ -22,7 +22,7 @@ Open a new login session when it finishes.
 
 ## What gets installed
 
-**Multiplexer and shell.** DevBox installs [Herdr](https://herdr.dev) with Omarchy's `ctrl+space` tmux-style keybindings, `tmux` as a fallback, Bash configured from pinned [Omadots](https://github.com/omacom-io/omadots), a Starship prompt that shows `@hostname` over SSH, and JetBrainsMono Nerd Font (`v3.5.1`). You also get `fzf`, `eza`, `zoxide`, `bat`, `ripgrep`, and `fd`.
+**Multiplexer and shell.** DevBox installs [Herdr](https://herdr.dev) with `ctrl+space` tmux-style keybindings, `tmux` as a fallback, Bash configured from pinned [Omadots](https://github.com/omacom-io/omadots), a Starship prompt that shows `@hostname` over SSH, and JetBrainsMono Nerd Font (`v3.5.1`). You also get `fzf`, `eza`, `zoxide`, `bat`, `ripgrep`, and `fd`.
 
 **Docker.** The installer sets up Docker Engine, Compose, `buildx`, and `lazydocker`. If `/etc/docker/daemon.json` does not exist yet, it writes a `10m` x `5` JSON log rotation policy so container logs do not fill the disk.
 
@@ -145,4 +145,4 @@ Updates leave your Git identity, GitHub login, Tailscale state, SSH keys, startu
 - DevBox creates empty user-owned skill directories at `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills`, `~/.gemini/antigravity-cli/skills`, and `~/.pi/agent/skills`.
 - Docker-published container ports bypass UFW rules. Restrict exposed ports in Docker's `DOCKER-USER` chain instead of relying on UFW.
 
-DevBox builds on ideas and configs from [Omarchy](https://github.com/basecamp/omarchy) and [Omaterm](https://learn.omacom.io/4/the-omaterm-manual).
+DevBox builds on ideas and configs from [Omaterm](https://learn.omacom.io/4/the-omaterm-manual).
