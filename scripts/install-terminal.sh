@@ -1,165 +1,98 @@
 #!/usr/bin/env bash
+NERD_FONT_VERSION="v3.5.1"
+JETBRAINS_MONO_SHA256="04d5e8f903693f9dd13e16f867e994834e681eb3c72c0d337a770dcda09010cf"
+
+setup_terminal_apt_repos() {
+  ensure_apt_keyring \
+    "Adding GitHub CLI APT keyring" \
+    https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    /etc/apt/keyrings/githubcli-archive-keyring.gpg
+  ensure_apt_source \
+    "Adding GitHub CLI APT repository" \
+    /etc/apt/sources.list.d/github-cli.list \
+    "deb [arch=${OS_ARCHITECTURE} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+
+  ensure_apt_keyring \
+    "Adding Charm APT keyring" \
+    https://repo.charm.sh/apt/gpg.key \
+    /etc/apt/keyrings/charm.asc
+  ensure_apt_source \
+    "Adding Charm APT repository" \
+    /etc/apt/sources.list.d/charm.list \
+    "deb [signed-by=/etc/apt/keyrings/charm.asc] https://repo.charm.sh/apt/ * *"
+
+  ensure_apt_keyring \
+    "Adding mise APT keyring" \
+    https://mise.jdx.dev/gpg-key.pub \
+    /etc/apt/keyrings/mise-archive-keyring.asc
+  ensure_apt_source \
+    "Adding mise APT repository" \
+    /etc/apt/sources.list.d/mise.list \
+    "deb [arch=${OS_ARCHITECTURE} signed-by=/etc/apt/keyrings/mise-archive-keyring.asc] https://mise.jdx.dev/deb stable main"
+}
+
+install_nerd_font() {
+  local font_dir="$HOME/.local/share/fonts/JetBrainsMonoNerdFont"
+  compgen -G "$font_dir/*.ttf" >/dev/null 2>&1 && return 0
+
+  if (( ${DRY_RUN:-0} == 1 )); then
+    echo "+ download and verify JetBrainsMono Nerd Font ${NERD_FONT_VERSION} into $font_dir"
+    return 0
+  fi
+
+  local tmp
+  tmp="$(mktemp -d)"
+  register_temp_dir "$tmp"
+
+  run_step "Downloading JetBrainsMono Nerd Font" \
+    curl -fsSL --proto '=https' --tlsv1.2 --retry 3 --max-time 60 \
+    "https://github.com/ryanoasis/nerd-fonts/releases/download/${NERD_FONT_VERSION}/JetBrainsMono.tar.xz" \
+    -o "$tmp/JetBrainsMono.tar.xz"
+  run_step "Verifying JetBrainsMono Nerd Font checksum" \
+    verify_sha256 "$JETBRAINS_MONO_SHA256" "$tmp/JetBrainsMono.tar.xz"
+
+  mkdir -p "$font_dir"
+  run_step "Extracting JetBrainsMono Nerd Font" \
+    tar -xJf "$tmp/JetBrainsMono.tar.xz" -C "$font_dir" --wildcards '*.ttf'
+  rm -rf "$tmp"
+
+  if command -v fc-cache >/dev/null 2>&1; then
+    run_step "Refreshing font cache" fc-cache -f "$font_dir"
+  fi
+}
+
 install_terminal() {
   log "Installing terminal and development tools"
-  # Debian/Ubuntu equivalents of Omaterm's headless Arch package set.
-  # build-essential, git, jq and OpenSSH are installed by install-base.sh.
+  if (( ${APT_REPOS_PREPARED:-0} == 0 )); then
+    setup_terminal_apt_repos
+  fi
+
   install_apt_packages \
-    tmux ripgrep fd-find fzf bash-completion bat \
-    clang llvm libyaml-dev luarocks \
-    less man-db vim whois kitty-terminfo
+    tmux ripgrep fd-find fzf bash-completion bat btop ncdu \
+    less vim kitty-terminfo gh gum mise
 
   mkdir -p "$HOME/.local/bin"
-  install_neovim
-
   # -L guards against a stale symlink left behind by a failed earlier run.
-  if [[ ! -e "$HOME/.local/bin/fd" && ! -L "$HOME/.local/bin/fd" ]] && command -v fdfind >/dev/null 2>&1; then
+  if [[ ! -e $HOME/.local/bin/fd && ! -L $HOME/.local/bin/fd ]] && command -v fdfind >/dev/null 2>&1; then
     run ln -s "$(command -v fdfind)" "$HOME/.local/bin/fd"
   fi
-  if [[ ! -e "$HOME/.local/bin/bat" && ! -L "$HOME/.local/bin/bat" ]] && command -v batcat >/dev/null 2>&1; then
+  if [[ ! -e $HOME/.local/bin/bat && ! -L $HOME/.local/bin/bat ]] && command -v batcat >/dev/null 2>&1; then
     run ln -s "$(command -v batcat)" "$HOME/.local/bin/bat"
   fi
 
-  if ! command -v starship >/dev/null 2>&1; then
-    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install Starship"; else curl -fsSL https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"; fi
+  local mise_bin
+  mise_bin="$(find_mise)"
+  if [[ -z $mise_bin ]] && (( ${DRY_RUN:-0} == 1 )); then
+    mise_bin="/usr/bin/mise"
   fi
-
-  local mise_bin="$HOME/.local/bin/mise"
-  [[ -x "$mise_bin" ]] || mise_bin="$(command -v mise || true)"
-  if [[ -z "$mise_bin" ]]; then
-    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-      echo "+ install mise"
-    else
-      curl -fsSL https://mise.run | sh
-      mise_bin="$HOME/.local/bin/mise"
-    fi
-  fi
-
-  # mise is activated by Omadots' shell inits, so mise-managed tools reach
-  # PATH. Installing zoxide through mise keeps it pinned to the mise
-  # registry instead of an install.sh from the project's default branch.
-  if ! command -v zoxide >/dev/null 2>&1; then
-    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then echo "+ install zoxide through mise"; else run "$mise_bin" use --global --yes zoxide; fi
-  fi
-
-  install_eza
-  install_gum
-  install_github_cli
-  install_lazygit
-  install_lazydocker
-}
-
-
-install_neovim() {
-  local current_version=""
-  if command -v nvim >/dev/null 2>&1; then
-    current_version="$(nvim --version | head -n1 | awk '{print $2}' | sed 's/^v//')"
-    if printf '%s\n%s\n' "0.11.2" "$current_version" | sort -V -C; then
-      return
-    fi
-  fi
-
-  [[ "${DRY_RUN:-0}" -eq 1 ]] && { echo "+ install current Neovim release to ~/.local/opt/nvim"; return; }
-
-  local machine asset tmp install_dir
-  machine="$(uname -m)"
-  case "$machine" in
-    x86_64|amd64) asset="nvim-linux-x86_64.tar.gz" ;;
-    aarch64|arm64) asset="nvim-linux-arm64.tar.gz" ;;
-    *) warn "Unsupported architecture for automatic Neovim installation: $machine"; return 1 ;;
-  esac
-
-  tmp="$(mktemp -d)"
-  install_dir="$HOME/.local/opt/nvim"
-  curl -fsSL "https://github.com/neovim/neovim/releases/latest/download/${asset}" -o "$tmp/nvim.tar.gz"
-  tar -xzf "$tmp/nvim.tar.gz" -C "$tmp"
-  rm -rf "$install_dir"
-  mkdir -p "$(dirname "$install_dir")"
-  mv "$tmp/${asset%.tar.gz}" "$install_dir"
-  ln -snf "$install_dir/bin/nvim" "$HOME/.local/bin/nvim"
-  rm -rf "$tmp"
-}
-
-install_github_cli() {
-  command -v gh >/dev/null 2>&1 && return
-  run sudo mkdir -p -m 755 /etc/apt/keyrings
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    echo "+ add GitHub CLI apt key and repository"
-  else
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
-    sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
-  fi
-  run sudo apt-get update
-  install_apt_packages gh
-}
-
-latest_github_release_tag() {
-  local tag
-  tag="$(curl -fsSL --max-time 30 --retry 3 "https://api.github.com/repos/$1/releases/latest" |
-    jq -r '.tag_name // empty')"
-  # A rate-limited or malformed response would otherwise flow into download
-  # URLs as the literal tag "null" and fail with a confusing error.
-  if [[ ! "$tag" =~ ^v?[0-9] ]]; then
-    echo "Could not determine the latest release tag for $1" >&2
+  if [[ -z $mise_bin ]]; then
+    warn "mise was not found. Skipping mise-managed CLI tools."
     return 1
   fi
-  printf '%s' "$tag"
-}
 
-install_eza() {
-  command -v eza >/dev/null 2>&1 && return
-  [[ "${DRY_RUN:-0}" -eq 1 ]] && { echo "+ install latest eza release"; return; }
+  run_step "Installing Neovim, Herdr, Starship, zoxide, eza, delta, lazygit, and lazydocker via mise" \
+    "$mise_bin" use --global --yes \
+    neovim herdr starship zoxide eza delta lazygit lazydocker
 
-  local version tmp target
-  version="$(latest_github_release_tag eza-community/eza)"
-  case "$(dpkg --print-architecture)" in
-    amd64) target="x86_64-unknown-linux-gnu" ;;
-    arm64) target="aarch64-unknown-linux-gnu" ;;
-    *) warn "Unsupported architecture for automatic eza installation"; return 1 ;;
-  esac
-
-  tmp="$(mktemp -d)"
-  curl -fsSL "https://github.com/eza-community/eza/releases/download/${version}/eza_${target}.tar.gz" |
-    tar -xz -C "$tmp"
-  install -m 0755 "$tmp/eza" "$HOME/.local/bin/eza"
-  rm -rf "$tmp"
-}
-
-install_gum() {
-  command -v gum >/dev/null 2>&1 && return
-  run sudo mkdir -p -m 755 /etc/apt/keyrings
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    echo "+ add Charm apt key and repository"
-  else
-    curl -fsSL https://repo.charm.sh/apt/gpg.key |
-      sudo gpg --dearmor --yes -o /etc/apt/keyrings/charm.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" |
-      sudo tee /etc/apt/sources.list.d/charm.list >/dev/null
-  fi
-  run sudo apt-get update
-  install_apt_packages gum
-}
-
-install_lazygit() {
-  command -v lazygit >/dev/null 2>&1 && return
-  [[ "${DRY_RUN:-0}" -eq 1 ]] && { echo "+ install latest lazygit release"; return; }
-  local version tmp arch
-  version="$(latest_github_release_tag jesseduffield/lazygit)"; version="${version#v}"
-  arch="$(dpkg --print-architecture)"; [[ "$arch" == amd64 ]] && arch=x86_64
-  tmp="$(mktemp -d)"
-  curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${version}/lazygit_${version}_linux_${arch}.tar.gz" | tar -xz -C "$tmp" lazygit
-  install -m 0755 "$tmp/lazygit" "$HOME/.local/bin/lazygit"
-  rm -rf "$tmp"
-}
-
-install_lazydocker() {
-  command -v lazydocker >/dev/null 2>&1 && return
-  [[ "${DRY_RUN:-0}" -eq 1 ]] && { echo "+ install latest lazydocker release"; return; }
-  local version tmp arch
-  version="$(latest_github_release_tag jesseduffield/lazydocker)"; version="${version#v}"
-  arch="$(dpkg --print-architecture)"; [[ "$arch" == amd64 ]] && arch=x86_64
-  tmp="$(mktemp -d)"
-  curl -fsSL "https://github.com/jesseduffield/lazydocker/releases/download/v${version}/lazydocker_${version}_Linux_${arch}.tar.gz" | tar -xz -C "$tmp" lazydocker
-  install -m 0755 "$tmp/lazydocker" "$HOME/.local/bin/lazydocker"
-  rm -rf "$tmp"
+  install_nerd_font
 }

@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
+setup_tailscale_apt_repo() {
+  local base_url="https://pkgs.tailscale.com/stable/${OS_ID}"
+  ensure_apt_keyring \
+    "Adding Tailscale APT keyring" \
+    "${base_url}/${OS_CODENAME}.noarmor.gpg" \
+    /usr/share/keyrings/tailscale-archive-keyring.gpg
+  ensure_apt_source \
+    "Adding Tailscale APT repository" \
+    /etc/apt/sources.list.d/tailscale.list \
+    "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] ${base_url} ${OS_CODENAME} main"
+}
+
 install_tailscale() {
   log "Installing Tailscale"
-  if command -v tailscale >/dev/null 2>&1; then
-    log "Tailscale is already installed"
-    return
+  if (( ${APT_REPOS_PREPARED:-0} == 0 )); then
+    setup_tailscale_apt_repo
   fi
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    echo "+ curl Tailscale installer and execute it"
-  else
-    curl -fsSL https://tailscale.com/install.sh | sh
+  install_apt_packages tailscale
+  if (( ${DRY_RUN:-0} == 0 )) && ! tailscale ip -4 >/dev/null 2>&1; then
+    warn "Run 'sudo tailscale up' after installation to authenticate this server."
   fi
-  warn "Run 'sudo tailscale up' after installation to authenticate this server."
 }

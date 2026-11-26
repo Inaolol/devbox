@@ -5,8 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 find "$ROOT" -type f -name '*.sh' -print0 | while IFS= read -r -d '' file; do
   bash -n "$file"
 done
-bash -n "$ROOT/scripts/devbox-setup" "$ROOT/configs/shell/devbox-server"
-bash -n "$ROOT/bin/devbox" "$ROOT/scripts/devbox-db"
+bash -n "$ROOT/scripts/devbox-setup" "$ROOT/configs/shell/devbox-server" "$ROOT/bin/devbox"
 
 if command -v shellcheck >/dev/null 2>&1; then
   find "$ROOT" -type f -name '*.sh' ! -path "$ROOT/tests/*" -print0 | xargs -0 shellcheck
@@ -20,16 +19,37 @@ else
   echo "shellcheck not installed; syntax checks completed"
 fi
 
+# Deleted features and dead files must stay absent.
+for dead in \
+  scripts/devbox-windows-vm \
+  bin/devbox-sub/windows-vm.sh \
+  scripts/devbox-db \
+  bin/devbox-sub/databases.sh \
+  scripts/install-adguard.sh \
+  configs/tmux.conf \
+  docs/compatibility-audit-2026-07-31.md; do
+  if [[ -e $ROOT/$dead ]]; then
+    echo "Deleted file still exists: $dead" >&2
+    exit 1
+  fi
+done
+
+# Zero curl | sh remote script execution anywhere in scripts/.
+if grep -rnE 'curl[^|]*\|[[:space:]]*(ba)?sh' "$ROOT/scripts"; then
+  echo "Scripts must not pipe curl directly into sh/bash" >&2
+  exit 1
+fi
+
 grep -q 'set -Eeuo pipefail' "$ROOT/install.sh"
 grep -q 'detect_supported_os' "$ROOT/install.sh"
 grep -q 'require_sudo' "$ROOT/install.sh"
 grep -q 'require_sudo' "$ROOT/scripts/lib.sh"
-grep -q 'run_component services install_services' "$ROOT/install.sh"
+grep -q 'install_services' "$ROOT/install.sh"
 if grep -qi '1password' "$ROOT/install.sh"; then
   echo "1Password must not be installed or managed by DevBox" >&2
   exit 1
 fi
-grep -q 'run_component configs refresh_configs' "$ROOT/install.sh"
+grep -q 'refresh_configs' "$ROOT/install.sh"
 grep -q '.local/state/devbox' "$ROOT/install.sh"
 grep -q 'run_migrations' "$ROOT/install.sh"
 grep -q '.local/state/devbox/migrations' "$ROOT/scripts/migrations.sh"
@@ -46,8 +66,8 @@ grep -q '.local/state/devbox/migrations' "$ROOT/scripts/migrations.sh"
   rm -rf "$REPO_ROOT" "$HOME"
 )
 
-# Structured progress: run() captures output into the install log, shows a
-# concise result line, and surfaces the failing output tail on errors.
+# Structured progress: run()/run_step() captures output into a 0600 install log,
+# shows a concise result line, and surfaces the failing output tail on errors.
 grep -q 'DEVBOX_INSTALL_LOG_FILE' "$ROOT/scripts/lib.sh"
 grep -q 'install_start_log' "$ROOT/scripts/lib.sh"
 grep -q 'install_end_log' "$ROOT/scripts/lib.sh"
@@ -56,17 +76,19 @@ grep -q '=== Devbox install started' "$ROOT/scripts/lib.sh"
 grep -q '=== Devbox install completed' "$ROOT/scripts/lib.sh"
 grep -q '=== Devbox install FAILED' "$ROOT/scripts/lib.sh"
 grep -q 'Last output' "$ROOT/scripts/lib.sh"
-# Failed and interrupted commands must reach the spinner cleanup under set -e.
 grep -q 'if "\$@" >>"\$log_file" 2>&1; then' "$ROOT/scripts/lib.sh"
 grep -q 'install_start_log' "$ROOT/install.sh"
 grep -q 'DEVBOX_INSTALL_LOG_FILE' "$ROOT/install.sh"
-grep -q "run bash \"\$migration\"" "$ROOT/scripts/migrations.sh"
+grep -q 'run bash "\$migration"' "$ROOT/scripts/migrations.sh"
+
 (
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' EXIT
   export DEVBOX_INSTALL_LOG_FILE="$work/install.log"
   export DRY_RUN=0
   source "$ROOT/scripts/lib.sh"
+  install_start_log
+  [[ "$(stat -c %a "$work/install.log")" == "600" ]]
   run printf '%s' 'hidden output' >/dev/null 2>&1
   grep -q '^hidden output$' "$work/install.log"
   set +e
@@ -74,11 +96,11 @@ grep -q "run bash \"\$migration\"" "$ROOT/scripts/migrations.sh"
   status=$?
   set -e
   (( status == 3 ))
-  install_start_log
   install_end_log
   grep -q '=== Devbox install started:' "$work/install.log"
   grep -q '=== Devbox install completed:' "$work/install.log"
 )
+
 # Sudo must authenticate before the command is hidden behind progress output.
 (
   work="$(mktemp -d)"
@@ -99,11 +121,11 @@ grep -q "run bash \"\$migration\"" "$ROOT/scripts/migrations.sh"
   source "$ROOT/scripts/lib.sh"
   run sudo true >/dev/null 2>&1
 )
+
 # require_sudo passes silently with passwordless sudo and prompts once
-# otherwise; an account with no usable sudo must fail fast with guidance
-# instead of hanging on a hidden password prompt mid-install.
+# otherwise; an account with no usable sudo must fail fast.
 (
-  sudo() { [[ "$1" == "-n" ]]; }
+  sudo() { [[ $1 == "-n" ]]; }
   export DRY_RUN=0
   # shellcheck disable=SC1091
   source "$ROOT/scripts/lib.sh"
@@ -114,7 +136,7 @@ grep -q "run bash \"\$migration\"" "$ROOT/scripts/migrations.sh"
   trap 'rm -f "$calls"' EXIT
   sudo() {
     printf '%s\n' "$1" >>"$calls"
-    [[ "$1" == "-n" ]] && return 1
+    [[ $1 == "-n" ]] && return 1
     return 0
   }
   export DRY_RUN=0
@@ -133,48 +155,77 @@ grep -q "run bash \"\$migration\"" "$ROOT/scripts/migrations.sh"
     exit 1
   fi
 )
+
+# ensure_apt_updated runs apt-get update once until APT_REPOS_DIRTY=1.
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  export DRY_RUN=0
+  export DEVBOX_INSTALL_LOG_FILE=""
+  updates="$work/updates"
+  sudo() {
+    if [[ $1 == "apt-get" && $2 == "update" ]]; then
+      echo "update" >>"$updates"
+    fi
+  }
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/lib.sh"
+  ensure_apt_updated
+  ensure_apt_updated
+  (( $(wc -l <"$updates") == 1 ))
+  APT_REPOS_DIRTY=1
+  ensure_apt_updated
+  ensure_apt_updated
+  (( $(wc -l <"$updates") == 2 ))
+)
+
+# Docker installer uses signed APT repo, log rotation, removes conflicts, and warns on DOCKER-USER.
 grep -q 'docker-ce' "$ROOT/scripts/install-docker.sh"
 grep -q 'podman-docker' "$ROOT/scripts/install-docker.sh"
 grep -q 'DOCKER-USER' "$ROOT/scripts/install-docker.sh"
-# The literal placeholder must appear in the installer.
+grep -q '/etc/docker/daemon.json' "$ROOT/scripts/install-docker.sh"
+grep -q '"max-size": "10m"' "$ROOT/scripts/install-docker.sh"
+grep -q '"max-file": "5"' "$ROOT/scripts/install-docker.sh"
 # shellcheck disable=SC2016
 grep -q 'download.docker.com/linux/${OS_ID}' "$ROOT/scripts/install-docker.sh"
-grep -q 'nvim-linux-x86_64.tar.gz' "$ROOT/scripts/install-terminal.sh"
-grep -q '0.11.2' "$ROOT/scripts/install-terminal.sh"
-grep -q 'bash-completion bat' "$ROOT/scripts/install-terminal.sh"
-grep -q 'command -v batcat' "$ROOT/scripts/install-terminal.sh"
-grep -q 'install_eza' "$ROOT/scripts/install-terminal.sh"
-grep -q 'install_gum' "$ROOT/scripts/install-terminal.sh"
-grep -q 'kitty-terminfo' "$ROOT/scripts/install-terminal.sh"
-# zoxide must come from the pinned mise registry, not an unpinned install.sh
-# from the project's default branch.
-grep -q '"$mise_bin" use --global --yes zoxide' "$ROOT/scripts/install-terminal.sh"
-if grep -q 'ajeetdsouza/zoxide' "$ROOT/scripts/install-terminal.sh"; then
-  echo "zoxide must not be installed from an unpinned remote script" >&2
+
+# Base ergonomics: SSH keepalives and PAM non-interactive PATH.
+grep -q '20-devbox-keepalive.conf' "$ROOT/scripts/install-base.sh"
+grep -q 'ServerAliveInterval 15' "$ROOT/scripts/install-base.sh"
+grep -q 'pam_env.conf' "$ROOT/scripts/install-base.sh"
+grep -q 'mise/shims' "$ROOT/scripts/install-base.sh"
+
+# Tailscale uses its signed APT repo, not tailscale.com/install.sh.
+grep -q 'pkgs.tailscale.com/stable' "$ROOT/scripts/install-tailscale.sh"
+if grep -q 'tailscale.com/install.sh' "$ROOT/scripts/install-tailscale.sh"; then
+  echo "Tailscale must use the signed APT repository, not tailscale.com/install.sh" >&2
   exit 1
 fi
-# The literal release URL placeholders must appear in the installer.
-# shellcheck disable=SC2016
-grep -q 'lazygit_${version}_linux_${arch}.tar.gz' "$ROOT/scripts/install-terminal.sh"
-# The latest-release lookup must fail clearly on rate limits and empty
-# responses instead of flowing the literal tag "null" into download URLs.
-grep -q '.tag_name // empty' "$ROOT/scripts/install-terminal.sh"
-grep -q 'Could not determine the latest release tag' "$ROOT/scripts/install-terminal.sh"
-(
-  # shellcheck disable=SC1091
-  source "$ROOT/scripts/install-terminal.sh"
-  curl() { printf '%s' '{"message":"API rate limit exceeded"}'; }
-  if latest_github_release_tag eza-community/eza >/dev/null 2>&1; then
-    echo "latest_github_release_tag must fail on a rate-limited response" >&2
+
+# Terminal tools: signed APT repos (gh, gum, mise), checksum-verified mise tools
+# (including herdr & delta), btop/ncdu, and checksum-verified JetBrainsMono Nerd Font,
+# without bloated compiler/manual packages.
+grep -q 'mise.jdx.dev/deb' "$ROOT/scripts/install-terminal.sh"
+grep -q 'repo.charm.sh/apt' "$ROOT/scripts/install-terminal.sh"
+grep -q 'cli.github.com/packages' "$ROOT/scripts/install-terminal.sh"
+grep -q 'bash-completion bat btop ncdu' "$ROOT/scripts/install-terminal.sh"
+grep -q 'command -v batcat' "$ROOT/scripts/install-terminal.sh"
+grep -q 'kitty-terminfo' "$ROOT/scripts/install-terminal.sh"
+grep -q 'neovim herdr starship zoxide eza delta lazygit lazydocker' "$ROOT/scripts/install-terminal.sh"
+grep -q 'install_nerd_font' "$ROOT/scripts/install-terminal.sh"
+grep -q 'NERD_FONT_VERSION=' "$ROOT/scripts/install-terminal.sh"
+grep -q 'verify_sha256' "$ROOT/scripts/install-terminal.sh"
+grep -q 'sha256sum' "$ROOT/scripts/lib.sh"
+for bloated in clang llvm libyaml-dev luarocks whois man-db; do
+  if grep -qw "$bloated" "$ROOT/scripts/install-terminal.sh"; then
+    echo "Bloated package must not be in install-terminal.sh: $bloated" >&2
     exit 1
   fi
-  curl() { printf '%s' '{"tag_name":"v0.21.4"}'; }
-  [[ "$(latest_github_release_tag eza-community/eza)" == "v0.21.4" ]]
-)
+done
+
+# AI tools and user-owned skill roots.
 grep -q 'aqua:modem-dev/hunk' "$ROOT/scripts/install-ai.sh"
 grep -q 'antigravity-cli' "$ROOT/scripts/install-ai.sh"
-# Match the tool name as a standalone token: the Antigravity skills path
-# contains ".gemini/" but must not trip this guard.
 if grep -qE '(^|[[:space:]])gemini([[:space:]]|$)' "$ROOT/scripts/install-ai.sh"; then
   echo "Deprecated Gemini CLI should not be installed; Antigravity CLI replaces it" >&2
   exit 1
@@ -184,118 +235,110 @@ if grep -q 'github:basecamp/basecamp-cli' "$ROOT/scripts/install-ai.sh"; then
   exit 1
 fi
 grep -q 'No API keys are stored' "$ROOT/scripts/install-ai.sh"
-# These literal HOME paths must remain user-owned skill roots.
 # shellcheck disable=SC2016
 grep -q '"$HOME/.agents/skills"' "$ROOT/scripts/install-ai.sh"
 # shellcheck disable=SC2016
 grep -q '"$HOME/.claude/skills"' "$ROOT/scripts/install-ai.sh"
 # shellcheck disable=SC2016
 grep -q '"$HOME/.codex/skills"' "$ROOT/scripts/install-ai.sh"
-# The Antigravity CLI reads global skills from ~/.gemini/antigravity-cli/skills.
 # shellcheck disable=SC2016
 grep -q '"$HOME/.gemini/antigravity-cli/skills"' "$ROOT/scripts/install-ai.sh"
 # shellcheck disable=SC2016
 grep -q '"$HOME/.pi/agent/skills"' "$ROOT/scripts/install-ai.sh"
-grep -q 'set -g prefix C-Space' "$ROOT/configs/tmux.conf"
-grep -q 'prefix2 C-b' "$ROOT/configs/tmux.conf"
+
+# Configs: pinned SHAs, single-fetch, raw refresh, and user-state preservation.
 grep -q 'omacom-io/omadots' "$ROOT/scripts/install-configs.sh"
-# Upstream configs are sourced by every login shell; they must stay pinned
-# to full commit SHAs so upstream changes land deliberately.
 grep -qE 'OMADOTS_REF="[0-9a-f]{40}"' "$ROOT/scripts/install-configs.sh"
 grep -qE 'LAZYVIM_STARTER_REF="[0-9a-f]{40}"' "$ROOT/scripts/install-configs.sh"
 grep -q 'clone_pinned https://github.com/omacom-io/omadots.git "\$OMADOTS_REF"' "$ROOT/scripts/install-configs.sh"
 grep -q 'clone_pinned https://github.com/LazyVim/starter.git "\$LAZYVIM_STARTER_REF"' "$ROOT/scripts/install-configs.sh"
-# The pinned checkout must be verified against the expected SHA.
 grep -q 'rev-parse HEAD' "$ROOT/scripts/install-configs.sh"
-# The literal HOME expression must appear in the installer.
+grep -q 'raw.githubusercontent.com/omacom-io/omadots/\${OMADOTS_REF}/config' "$ROOT/scripts/install-configs.sh"
 # shellcheck disable=SC2016
 grep -q 'backup_path "$HOME/.bashrc"' "$ROOT/scripts/install-configs.sh"
 # shellcheck disable=SC2016
 grep -q 'git config --file "$HOME/.gitconfig" user.name' "$ROOT/scripts/install-configs.sh"
+grep -q 'core.pager delta' "$ROOT/scripts/install-configs.sh"
+# shellcheck disable=SC2016
+grep -q 'HERDR_ENV' "$ROOT/scripts/install-configs.sh"
+# shellcheck disable=SC2016
+grep -q 'DEVBOX_NO_HERDR' "$ROOT/scripts/install-configs.sh"
 # shellcheck disable=SC2016
 grep -q 'DEVBOX_NO_TMUX' "$ROOT/scripts/install-configs.sh"
-grep -q 'tmux new-session -s Work' "$ROOT/scripts/install-configs.sh"
-grep -q 'Git identity is already configured' "$ROOT/scripts/devbox-setup"
-grep -q 'GitHub is already authenticated' "$ROOT/scripts/devbox-setup"
-grep -q 'gh auth login --hostname github.com --git-protocol https --web </dev/null' "$ROOT/scripts/devbox-setup"
-grep -q 'Tailscale is already connected' "$ROOT/scripts/devbox-setup"
-grep -q 'An SSH public key is already installed' "$ROOT/scripts/devbox-setup"
-grep -q "alias lzd='lazydocker'" "$ROOT/configs/shell/devbox-server"
-grep -q "alias cls='clear'" "$ROOT/configs/shell/devbox-server"
-# The literal fallback must initialize tmux with UTF-8 character handling.
 # shellcheck disable=SC2016
-grep -q 'export LANG="${LANG:-C.UTF-8}"' "$ROOT/configs/shell/devbox-server"
-grep -q 'C.UTF-8' "$ROOT/migrations/20260731-set-utf8-locale.sh"
-grep -q 'disable-password-auth' "$ROOT/scripts/devbox-setup"
-grep -q 'sshd -t' "$ROOT/scripts/devbox-setup"
-grep -q 'not Tailscale SSH' "$ROOT/scripts/devbox-setup"
-grep -q -- '--with-adguard' "$ROOT/install.sh"
-grep -q 'adguard/adguardhome' "$ROOT/scripts/install-adguard.sh"
-grep -q '53:53' "$ROOT/scripts/install-adguard.sh"
-# The AdGuard web admin must not be reachable from the network: only DNS
-# (port 53, the component's purpose) stays published on all interfaces.
-if grep -Eq '"(80|3000):(80|3000)' "$ROOT/scripts/install-adguard.sh"; then
-  echo "AdGuard admin ports must be bound to 127.0.0.1" >&2
-  exit 1
-fi
-grep -q '127.0.0.1:3000:3000' "$ROOT/scripts/install-adguard.sh"
-grep -q '127.0.0.1:80:80' "$ROOT/scripts/install-adguard.sh"
-
-grep -q 'sudo tailscale up' "$ROOT/scripts/devbox-setup"
-
-# The Tailscale auth key must travel through the environment, never argv
-# (argv is readable by any local user via ps and /proc/*/cmdline).
-grep -q 'TS_AUTHKEY' "$ROOT/scripts/devbox-setup"
-if grep -qF -- '--auth-key=$auth_key' "$ROOT/scripts/devbox-setup"; then
-  echo "Tailscale auth key must not be passed as a command argument" >&2
-  exit 1
-fi
-# Secret-bearing env vars must be unset once consumed.
-grep -q 'DEVBOX_SETUP_GH_TOKEN DEVBOX_SETUP_TS_AUTH_KEY' "$ROOT/scripts/install-services.sh"
-# Remote installers must fail on HTTP errors instead of piping error pages
-# into sh, and follow redirects.
-grep -q 'curl -fsSL https://mise.run' "$ROOT/scripts/install-terminal.sh"
-grep -q 'curl -fsSL https://starship.rs/install.sh' "$ROOT/scripts/install-terminal.sh"
-# The bootstrap refuses to run as root before touching the system.
-grep -q 'EUID' "$ROOT/bootstrap.sh"
-# bootstrap must refuse to clobber a non-empty directory that is not a
-# devbox checkout instead of removing it.
-(
-  work="$(mktemp -d)"
-  trap 'rm -rf "$work"' EXIT
-  mkdir -p "$work/target"
-  touch "$work/target/keepme"
-  if DEVBOX_DIR="$work/target" bash "$ROOT/bootstrap.sh" >/dev/null 2>&1; then
-    echo "bootstrap must refuse a non-empty non-checkout DEVBOX_DIR" >&2
-    exit 1
-  fi
-  [[ -e "$work/target/keepme" ]]
-)
-
-# Services installs the devbox CLI and devbox-db.
-grep -q 'devbox-db' "$ROOT/scripts/install-services.sh"
-grep -q 'DEVBOX_PATH/bin/devbox' "$ROOT/scripts/install-services.sh"
-grep -q 'DEVBOX_PATH' "$ROOT/scripts/install-services.sh"
-
-# Editor configs: Neovim QoL plugins and lazygit config are managed files.
+grep -q '$HOME/.config/devbox/startup' "$ROOT/scripts/install-configs.sh"
+grep -q 'tmux new-session -s Work' "$ROOT/scripts/install-configs.sh"
+grep -q 'configs/herdr/config.toml' "$ROOT/scripts/install-configs.sh"
+grep -q 'configs/starship.toml' "$ROOT/scripts/install-configs.sh"
 grep -q 'configs/nvim/plugins' "$ROOT/scripts/install-configs.sh"
 grep -q 'configs/lazygit/config.yml' "$ROOT/scripts/install-configs.sh"
 grep -q 'refresh_configs' "$ROOT/scripts/install-configs.sh"
 grep -q 'refresh_managed_file' "$ROOT/scripts/install-configs.sh"
-# Refresh shows the diff between the backup and the new config, omarchy-style.
 grep -q 'diff -u' "$ROOT/scripts/install-configs.sh"
-# Force-replacing configs must preserve a legacy user secret.
-grep -q 'OP_SERVICE_ACCOUNT_TOKEN' "$ROOT/scripts/install-configs.sh"
-# Replacing configs must preserve mise tools installed by install-ai.
 grep -q 'mise_tools' "$ROOT/scripts/install-configs.sh"
 # shellcheck disable=SC2016
 grep -qF '\[tools\]' "$ROOT/scripts/install-configs.sh"
+if grep -q 'OP_SERVICE_ACCOUNT_TOKEN' "$ROOT/scripts/install-configs.sh"; then
+  echo "Legacy 1Password token handling must be removed" >&2
+  exit 1
+fi
+test -f "$ROOT/configs/herdr/config.toml"
+grep -q 'prefix = "ctrl+space"' "$ROOT/configs/herdr/config.toml"
+grep -q 'onboarding = false' "$ROOT/configs/herdr/config.toml"
+grep -q 'accent = "blue"' "$ROOT/configs/herdr/config.toml"
+grep -q 'pane_gaps = false' "$ROOT/configs/herdr/config.toml"
+test -f "$ROOT/configs/starship.toml"
+grep -q 'ssh_only = true' "$ROOT/configs/starship.toml"
+grep -q 'truncation_length = 2' "$ROOT/configs/starship.toml"
 test -f "$ROOT/configs/nvim/plugins/colorscheme.lua"
 test -f "$ROOT/configs/nvim/plugins/disable-news-alert.lua"
 test -f "$ROOT/configs/nvim/plugins/snacks-animated-scrolling.lua"
 test -f "$ROOT/configs/lazygit/config.yml"
 grep -q '#7aa2f7' "$ROOT/configs/lazygit/config.yml"
 grep -q 'showGraph' "$ROOT/configs/lazygit/config.yml"
+
+# refresh_configs refreshes tmux.conf, starship.toml, and herdr/config.toml with timestamped backups.
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  HOME="$work/home"
+  REPO_ROOT="$ROOT"
+  mkdir -p "$HOME/.config/tmux" "$HOME/.config/herdr"
+  printf 'old tmux\n' >"$HOME/.config/tmux/tmux.conf"
+  printf 'old starship\n' >"$HOME/.config/starship.toml"
+  printf 'old herdr\n' >"$HOME/.config/herdr/config.toml"
+  export DRY_RUN=0
+  export DEVBOX_INSTALL_LOG_FILE=""
+  source "$ROOT/scripts/lib.sh"
+  source "$ROOT/scripts/install-configs.sh"
+  curl() {
+    local url="" out=""
+    while (( $# )); do
+      case "$1" in
+        -o) out="$2"; shift 2 ;;
+        http*) url="$1"; shift ;;
+        *) shift ;;
+      esac
+    done
+    [[ $url == *"/$OMADOTS_REF/config/tmux/tmux.conf" ]] || return 1
+    printf 'new tmux.conf\n' >"$out"
+  }
+  refresh_configs >/dev/null
+  grep -q 'new tmux.conf' "$HOME/.config/tmux/tmux.conf"
+  grep -q 'ssh_only = true' "$HOME/.config/starship.toml"
+  grep -q 'prefix = "ctrl+space"' "$HOME/.config/herdr/config.toml"
+  compgen -G "$HOME/.config/tmux/tmux.conf.backup.*" >/dev/null
+  compgen -G "$HOME/.config/starship.toml.backup.*" >/dev/null
+  compgen -G "$HOME/.config/herdr/config.toml.backup.*" >/dev/null
+)
+
+# DevBox server shell additions and migrations.
+grep -q "alias lzd='lazydocker'" "$ROOT/configs/shell/devbox-server"
+grep -q "alias h='herdr'" "$ROOT/configs/shell/devbox-server"
+grep -q "alias cls='clear'" "$ROOT/configs/shell/devbox-server"
+# shellcheck disable=SC2016
+grep -q 'export LANG="${LANG:-C.UTF-8}"' "$ROOT/configs/shell/devbox-server"
+grep -q 'C.UTF-8' "$ROOT/migrations/20260731-set-utf8-locale.sh"
 grep -q 'lazygit' "$ROOT/migrations/20260805-install-editor-configs.sh"
 grep -q 'colorscheme.lua' "$ROOT/migrations/20260805-install-editor-configs.sh"
 grep -q 'DEVBOX_NO_TMUX' "$ROOT/migrations/20260917-auto-attach-tmux.sh"
@@ -311,112 +354,177 @@ grep -q 'tmux new-session -s Work' "$ROOT/migrations/20260917-auto-attach-tmux.s
   bash "$ROOT/migrations/20260917-auto-attach-tmux.sh"
   (( $(grep -c 'tmux new-session -s Work' "$HOME/.bashrc") == 1 ))
 )
+# Herdr migration upgrades old tmux auto-attach block idempotently, preserves tmux
+# in startup when upgrading old auto-attach, leaves startup off otherwise, and
+# never overwrites user herdr config.
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  HOME="$work/old"
+  REPO_ROOT="$ROOT"
+  mkdir -p "$HOME/.config/shell"
+  touch "$HOME/.bashrc" "$HOME/.config/shell/devbox-server"
+  bash "$ROOT/migrations/20260917-auto-attach-tmux.sh"
+  REPO_ROOT="$ROOT" bash "$ROOT/migrations/20261127-herdr-and-omarchy-defaults.sh"
+  grep -q 'HERDR_ENV' "$HOME/.bashrc"
+  grep -q 'startup' "$HOME/.bashrc"
+  [[ $(cat "$HOME/.config/devbox/startup") == "tmux" ]]
+  grep -q "alias h='herdr'" "$HOME/.config/shell/devbox-server"
+  grep -q 'prefix = "ctrl+space"' "$HOME/.config/herdr/config.toml"
+  printf '# user customized\n' >"$HOME/.config/herdr/config.toml"
+  REPO_ROOT="$ROOT" bash "$ROOT/migrations/20261127-herdr-and-omarchy-defaults.sh"
+  (( $(grep -c 'HERDR_ENV' "$HOME/.bashrc") == 1 ))
+  (( $(grep -c "alias h='herdr'" "$HOME/.config/shell/devbox-server") == 1 ))
+  grep -qx '# user customized' "$HOME/.config/herdr/config.toml"
 
-# Dev databases: localhost-only containers for the full dev stack.
-grep -q '127.0.0.1' "$ROOT/scripts/devbox-db"
-grep -q 'postgres:18' "$ROOT/scripts/devbox-db"
-grep -q 'mysql:8.4' "$ROOT/scripts/devbox-db"
-grep -q 'redis:7' "$ROOT/scripts/devbox-db"
-grep -q 'gum choose' "$ROOT/scripts/devbox-db"
-grep -q 'devbox-db remove' "$ROOT/scripts/devbox-db"
-# Menu labels must map explicitly to installable keys: lowercasing produced
-# "postgresql" and "mongodb", which db_name does not recognize, so selecting
-# PostgreSQL or MongoDB in the menu silently did nothing.
-grep -q 'PostgreSQL) db="postgres"' "$ROOT/scripts/devbox-db"
-grep -q 'MongoDB) db="mongo"' "$ROOT/scripts/devbox-db"
+  HOME="$work/plain"
+  mkdir -p "$HOME"
+  printf '# plain\n' >"$HOME/.bashrc"
+  REPO_ROOT="$ROOT" bash "$ROOT/migrations/20261127-herdr-and-omarchy-defaults.sh"
+  grep -q 'HERDR_ENV' "$HOME/.bashrc"
+  [[ ! -e $HOME/.config/devbox/startup ]]
+)
+
+# Services: no redundant gh install, passes --auth-key-stdin, safe DEVBOX_PATH quoting.
+if grep -q 'install_apt_packages gh' "$ROOT/scripts/install-services.sh"; then
+  echo "install-services.sh must not redundantly install gh" >&2
+  exit 1
+fi
+grep -q -- '--auth-key-stdin' "$ROOT/scripts/install-services.sh"
+if grep -q -- '--auth-key "' "$ROOT/scripts/install-services.sh"; then
+  echo "install-services.sh must pass Tailscale auth key via stdin, not argv" >&2
+  exit 1
+fi
+grep -q 'DEVBOX_SETUP_GH_TOKEN DEVBOX_SETUP_TS_AUTH_KEY' "$ROOT/scripts/install-services.sh"
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  HOME="$work/home"
+  REPO_ROOT="$work/dir with spaces"
+  mkdir -p "$REPO_ROOT/bin" "$REPO_ROOT/scripts"
+  cp "$ROOT/scripts/devbox-setup" "$REPO_ROOT/scripts/devbox-setup"
+  cat >"$REPO_ROOT/bin/devbox" <<'WRAP'
+#!/usr/bin/env bash
+printf 'ok:%s\n' "$1"
+WRAP
+  chmod +x "$REPO_ROOT/bin/devbox"
+  export DRY_RUN=0 DEVBOX_UPDATE=1 DEVBOX_INSTALL_LOG_FILE=""
+  source "$ROOT/scripts/lib.sh"
+  source "$ROOT/scripts/install-services.sh"
+  install_services >/dev/null
+  [[ "$("$HOME/.local/bin/devbox" ping)" == "ok:ping" ]]
+)
+
+# devbox-setup: auth key env safety, multi-line SSH key rejection, missing flag arg guard.
+grep -q 'Git identity is already configured' "$ROOT/scripts/devbox-setup"
+grep -q 'GitHub is already authenticated' "$ROOT/scripts/devbox-setup"
+grep -q 'gh auth login --hostname github.com --git-protocol https --web </dev/null' "$ROOT/scripts/devbox-setup"
+grep -q 'Tailscale is already connected' "$ROOT/scripts/devbox-setup"
+grep -q 'An SSH public key is already installed' "$ROOT/scripts/devbox-setup"
+grep -q 'disable-password-auth' "$ROOT/scripts/devbox-setup"
+grep -q 'sshd -t' "$ROOT/scripts/devbox-setup"
+grep -q 'not Tailscale SSH' "$ROOT/scripts/devbox-setup"
+grep -q 'TS_AUTHKEY' "$ROOT/scripts/devbox-setup"
+if grep -qF -- '--auth-key=$auth_key' "$ROOT/scripts/devbox-setup"; then
+  echo "Tailscale auth key must not be passed as a command argument" >&2
+  exit 1
+fi
 (
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' EXIT
   mkdir -p "$work/bin"
-  cat > "$work/bin/gum" <<'STUB'
+  cat >"$work/bin/sudo" <<'STUB'
 #!/usr/bin/env bash
-[[ "$1" == "choose" ]] && printf '%s\n' "PostgreSQL" "MongoDB"
+if [[ $1 == "env" ]]; then
+  shift
+  env "$@"
+else
+  "$@"
+fi
 STUB
-  cat > "$work/bin/docker" <<'STUB'
+  cat >"$work/bin/tailscale" <<'STUB'
 #!/usr/bin/env bash
-if [[ "$1" == "ps" ]]; then exit 0; fi
-printf '%s\n' "$*" >>"$DEVBOX_DB_DOCKER_LOG"
+printf '%s|%s\n' "${TS_AUTHKEY:-}" "$*" >"$DEVBOX_TS_CALL"
 STUB
-  chmod +x "$work/bin/gum" "$work/bin/docker"
-  sudo() { "$@"; }
-  export -f sudo
-  export DEVBOX_DB_DOCKER_LOG="$work/docker.log"
-  PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-db" >/dev/null
-  grep -q -- '--name postgres18' "$work/docker.log"
-  grep -q -- '--name mongodb' "$work/docker.log"
+  chmod +x "$work/bin/sudo" "$work/bin/tailscale"
+  export DEVBOX_TS_CALL="$work/ts.call"
+  if PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-setup" git --name 2>/dev/null; then
+    echo "devbox-setup must reject missing flag argument" >&2
+    exit 1
+  fi
+  if PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-setup" ssh --key $'ssh-ed25519 AAAA\nextra' 2>/dev/null; then
+    echo "devbox-setup must reject multi-line SSH keys" >&2
+    exit 1
+  fi
+  printf 'tskey-secret\n' | PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-setup" tailscale --hostname srv1 --auth-key-stdin >/dev/null
+  grep -q '^tskey-secret|up --ssh --accept-routes --hostname=srv1$' "$work/ts.call"
 )
 
-# The devbox CLI menu and subs.
+# devbox-setup startup: defaults to off and toggles between herdr, tmux, and off.
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  HOME="$work/home"
+  mkdir -p "$work/bin" "$HOME"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$work/bin/herdr"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$work/bin/tmux"
+  chmod +x "$work/bin/herdr" "$work/bin/tmux"
+  [[ "$(HOME="$HOME" PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-setup" startup status)" == "Startup auto-attach: off" ]]
+  [[ ! -e $HOME/.config/devbox/startup ]]
+  HOME="$HOME" PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-setup" startup herdr >/dev/null
+  [[ $(cat "$HOME/.config/devbox/startup") == "herdr" ]]
+  [[ "$(HOME="$HOME" PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-setup" startup status)" == "Startup auto-attach: herdr" ]]
+  HOME="$HOME" PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-setup" startup tmux >/dev/null
+  [[ $(cat "$HOME/.config/devbox/startup") == "tmux" ]]
+  [[ "$(HOME="$HOME" PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-setup" startup status)" == "Startup auto-attach: tmux" ]]
+  HOME="$HOME" PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-setup" startup off >/dev/null
+  [[ ! -e $HOME/.config/devbox/startup ]]
+  [[ "$(HOME="$HOME" PATH="$work/bin:$PATH" bash "$ROOT/scripts/devbox-setup" startup status)" == "Startup auto-attach: off" ]]
+  if HOME="$HOME" bash "$ROOT/scripts/devbox-setup" startup screen >/dev/null 2>&1; then
+    echo "devbox-setup startup must reject invalid modes" >&2
+    exit 1
+  fi
+)
+
+# Bootstrap safety: refuses root and unsafe DEVBOX_DIR values ($HOME, /, non-checkout).
+grep -q 'EUID' "$ROOT/bootstrap.sh"
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  mkdir -p "$work/target"
+  touch "$work/target/keepme"
+  if DEVBOX_DIR="$work/target" bash "$ROOT/bootstrap.sh" >/dev/null 2>&1; then
+    echo "bootstrap must refuse a non-empty non-checkout DEVBOX_DIR" >&2
+    exit 1
+  fi
+  [[ -e $work/target/keepme ]]
+  if HOME="$work/home" DEVBOX_DIR="$work/home" bash "$ROOT/bootstrap.sh" >/dev/null 2>&1; then
+    echo "bootstrap must refuse DEVBOX_DIR=\$HOME" >&2
+    exit 1
+  fi
+)
+
+# devbox CLI menu, subs, and setup arg forwarding.
 grep -q 'DEVBOX_PATH' "$ROOT/bin/devbox"
 grep -q 'devbox-sub' "$ROOT/bin/devbox"
 grep -q 'gum choose' "$ROOT/bin/devbox-sub/menu.sh"
-grep -q -- '--only adguard' "$ROOT/bin/devbox-sub/install.sh"
+grep -q -- '--only tailscale' "$ROOT/bin/devbox-sub/install.sh"
 grep -q 'tailscaled' "$ROOT/bin/devbox-sub/remove.sh"
 grep -q 'bootstrap.sh' "$ROOT/bin/devbox-sub/update.sh"
-
-# Windows VM: dockurr/windows compose file, KVM check, localhost-only ports,
-# env-var overrides for unattended installs, and the SSH tunnel hint.
-grep -q 'dockurr/windows' "$ROOT/scripts/devbox-windows-vm"
-grep -q '/dev/kvm' "$ROOT/scripts/devbox-windows-vm"
-grep -q '127.0.0.1:3389' "$ROOT/scripts/devbox-windows-vm"
-grep -q '127.0.0.1:8006' "$ROOT/scripts/devbox-windows-vm"
-grep -q 'DEVBOX_VM_RAM' "$ROOT/scripts/devbox-windows-vm"
-grep -q 'DEVBOX_VM_VERSION' "$ROOT/scripts/devbox-windows-vm"
-grep -q 'ssh -L 3389' "$ROOT/scripts/devbox-windows-vm"
-grep -q 'windows started successfully' "$ROOT/scripts/devbox-windows-vm"
-grep -q 'docker compose' "$ROOT/scripts/devbox-windows-vm"
-grep -q 'windows-vm' "$ROOT/bin/devbox-sub/menu.sh"
-test -x "$ROOT/scripts/devbox-windows-vm"
-# Bare `devbox vm` is an interactive session (install or manage), not help text.
-grep -q 'interactive_vm' "$ROOT/scripts/devbox-windows-vm"
-grep -q '"") interactive_vm ;;' "$ROOT/scripts/devbox-windows-vm"
-grep -q 'Windows VM is configured' "$ROOT/scripts/devbox-windows-vm"
-grep -q 'Reinstall' "$ROOT/scripts/devbox-windows-vm"
-# The menu must survive failing subs and return to the loop, and cancels
-# must not be errors.
-grep -q 'if run_sub "$sub"; then' "$ROOT/bin/devbox-sub/menu.sh"
-grep -q 'exited with an error (code' "$ROOT/bin/devbox-sub/menu.sh"
-grep -q "\[\[ \"\$sub\" == \"help\" \]\] && exit 0" "$ROOT/bin/devbox-sub/menu.sh"
-grep -q 'clear' "$ROOT/bin/devbox-sub/menu.sh"
-grep -q 'cancel()' "$ROOT/scripts/devbox-windows-vm"
-# The compose file holds the Windows password: user-only permissions and
-# values that cannot inject YAML lines.
-grep -q 'umask 077' "$ROOT/scripts/devbox-windows-vm"
-grep -q 'chmod 600 "$COMPOSE_FILE"' "$ROOT/scripts/devbox-windows-vm"
-grep -q 'yaml_quote' "$ROOT/scripts/devbox-windows-vm"
-# Every value in the compose file, including the timezone, must pass
-# through yaml_quote.
-grep -q 'TZ: $(yaml_quote' "$ROOT/scripts/devbox-windows-vm"
-# Reading USERNAME back must reverse yaml_quote's escaping so usernames
-# containing quotes or backslashes display as entered.
-grep -q 'yaml_unquote' "$ROOT/scripts/devbox-windows-vm"
 (
-  # shellcheck disable=SC1091
-  source "$ROOT/scripts/devbox-windows-vm"
-  [[ "$(printf '      USERNAME: "dev\\"box"\n' | yaml_unquote)" == 'dev"box' ]]
-  [[ "$(printf '      USERNAME: "a\\\\b"\n' | yaml_unquote)" == 'a\b' ]]
-  [[ "$(printf '      USERNAME: "devbox"\n' | yaml_unquote)" == 'devbox' ]]
-  [[ "$(yaml_quote 'dev"box')" == '"dev\"box"' ]]
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  mkdir -p "$work/bin"
+  ln -s "$ROOT/scripts/devbox-setup" "$work/bin/devbox-setup"
+  PATH="$work/bin:$PATH" "$ROOT/bin/devbox" setup --help | grep -q -- '--auth-key-stdin'
+  HOME="$work/home" PATH="$work/bin:$PATH" "$ROOT/bin/devbox" setup startup status | grep -q 'Startup auto-attach: off'
 )
-# The password must not be printed to the terminal.
-if grep -q 'password \$win_pass' "$ROOT/scripts/devbox-windows-vm"; then
-  echo "devbox vm must not print the Windows password" >&2
-  exit 1
-fi
-# The install log captures command output; it must stay user-readable only.
-grep -q 'umask 077' "$ROOT/scripts/lib.sh"
-# Failures must record the failing command in the install log.
-grep -q 'Failed command' "$ROOT/scripts/lib.sh"
-grep -q 'install_fail_log "\$status" "\$BASH_COMMAND"' "$ROOT/install.sh"
-# Update detection trusts the marker alone; a foreign dotfiles file must
-# never flip a first install into update mode.
+
+# install.sh flag validation & update detection.
 if grep -q 'devbox-server".*DEVBOX_UPDATE\|DEVBOX_UPDATE.*devbox-server' "$ROOT/install.sh"; then
   echo "Update detection must rely on the installed marker only" >&2
   exit 1
 fi
-grep -q '|| return 0' "$ROOT/scripts/devbox-db"
-# An unknown --only component must be rejected before anything runs, so a
-# typo cannot mark a fresh machine as installed and flip it to update mode.
 (
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' EXIT
@@ -424,19 +532,22 @@ grep -q '|| return 0' "$ROOT/scripts/devbox-db"
     echo "--only must reject unknown components" >&2
     exit 1
   fi
-  [[ ! -e "$work/.local/state/devbox/installed" ]]
+  set +e
+  HOME="$work" bash "$ROOT/install.sh" --only >/dev/null 2>&1
+  rc=$?
+  set -e
+  (( rc == 2 ))
+  [[ ! -e $work/.local/state/devbox/installed ]]
 )
-grep -q 'gum_choose DEVBOX_VM_RAM' "$ROOT/scripts/devbox-windows-vm"
 
-# Test OS detection independently of the host running the test.
-# ROOT is computed at runtime, so ShellCheck cannot resolve this source path.
+# OS detection tests (independent of host).
 # shellcheck disable=SC1091
 source "$ROOT/scripts/lib.sh"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 OS_ARCHITECTURE=amd64
 
-cat > "$tmp/ubuntu" <<'OS'
+cat >"$tmp/ubuntu" <<'OS'
 ID=ubuntu
 VERSION_ID="24.04"
 VERSION_CODENAME=noble
@@ -444,36 +555,35 @@ UBUNTU_CODENAME=noble
 PRETTY_NAME="Ubuntu 24.04 LTS"
 OS
 OS_RELEASE_FILE="$tmp/ubuntu" detect_supported_os
-[[ "$OS_ID" == ubuntu && "$OS_CODENAME" == noble ]]
+[[ $OS_ID == "ubuntu" && $OS_CODENAME == "noble" ]]
 
-cat > "$tmp/debian12" <<'OS'
+cat >"$tmp/debian12" <<'OS'
 ID=debian
 VERSION_ID="12"
 VERSION_CODENAME=bookworm
 PRETTY_NAME="Debian GNU/Linux 12 (bookworm)"
 OS
 OS_RELEASE_FILE="$tmp/debian12" detect_supported_os
-[[ "$OS_ID" == debian && "$OS_CODENAME" == bookworm ]]
+[[ $OS_ID == "debian" && $OS_CODENAME == "bookworm" ]]
 
-cat > "$tmp/debian13" <<'OS'
+cat >"$tmp/debian13" <<'OS'
 ID=debian
 VERSION_ID="13"
 VERSION_CODENAME=trixie
 PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
 OS
 OS_RELEASE_FILE="$tmp/debian13" detect_supported_os
-[[ "$OS_ID" == debian && "$OS_CODENAME" == trixie ]]
+[[ $OS_ID == "debian" && $OS_CODENAME == "trixie" ]]
 
 OS_ARCHITECTURE=i386
 if OS_RELEASE_FILE="$tmp/debian13" detect_supported_os 2>/dev/null; then
   echo "Unsupported architecture test failed" >&2
   exit 1
 fi
-# Reset for later suites; consumed by detect_supported_os, not this file.
 # shellcheck disable=SC2034
 OS_ARCHITECTURE=amd64
 
-cat > "$tmp/old-debian" <<'OS'
+cat >"$tmp/old-debian" <<'OS'
 ID=debian
 VERSION_ID="11"
 VERSION_CODENAME=bullseye
@@ -484,7 +594,7 @@ if OS_RELEASE_FILE="$tmp/old-debian" detect_supported_os 2>/dev/null; then
   exit 1
 fi
 
-cat > "$tmp/unsupported" <<'OS'
+cat >"$tmp/unsupported" <<'OS'
 ID=opensuse-leap
 VERSION_ID="15.6"
 VERSION_CODENAME=leap
@@ -494,19 +604,29 @@ if OS_RELEASE_FILE="$tmp/unsupported" detect_supported_os 2>/dev/null; then
   exit 1
 fi
 
-# Debian 13 does not provide software-properties-common. Keep Ubuntu-only
-# packages out of the shared Debian base package list.
-# shellcheck disable=SC1091
-source "$ROOT/scripts/install-base.sh"
-base_packages=()
-log() { :; }
-run() { :; }
-install_apt_packages() { base_packages=("$@"); }
-OS_ID=debian
-install_base
-if [[ " ${base_packages[*]} " == *" software-properties-common "* ]]; then
-  echo "Debian base packages include unavailable software-properties-common" >&2
-  exit 1
-fi
+# Base packages must not include ufw or Ubuntu-only software-properties-common.
+(
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/install-base.sh"
+  base_packages=()
+  log() { :; }
+  run_step() { :; }
+  sudo() { :; }
+  install_apt_packages() { base_packages=("$@"); }
+  OS_ID=debian
+  install_base
+  for unwanted in software-properties-common ufw; do
+    if [[ " ${base_packages[*]} " == *" $unwanted "* ]]; then
+      echo "Base packages must not include $unwanted" >&2
+      exit 1
+    fi
+  done
+  for wanted in rsync xz-utils; do
+    if [[ " ${base_packages[*]} " != *" $wanted "* ]]; then
+      echo "Base packages must include $wanted" >&2
+      exit 1
+    fi
+  done
+)
 
 echo "All tests passed"

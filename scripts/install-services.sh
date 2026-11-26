@@ -1,32 +1,29 @@
 #!/usr/bin/env bash
 
 install_services() {
-  log "Installing Omaterm-style service onboarding"
-  install_apt_packages gh
+  log "Installing DevBox CLI and service onboarding"
 
   local target_dir="$HOME/.local/bin"
   run mkdir -p "$target_dir"
   run install -m 0755 "$REPO_ROOT/scripts/devbox-setup" "$target_dir/devbox-setup"
-  run install -m 0755 "$REPO_ROOT/scripts/devbox-db" "$target_dir/devbox-db"
 
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    echo "+ write the devbox-setup onboarding helper"
-    echo "+ install the devbox CLI menu and the devbox-db database helper"
+  if (( ${DRY_RUN:-0} == 1 )); then
+    echo "+ write the devbox CLI wrapper and install devbox-setup"
     return
   fi
 
-  cat > "$target_dir/devbox" <<EOF
-#!/usr/bin/env bash
-export DEVBOX_PATH="$(printf '%q' "$REPO_ROOT")"
-exec "\$DEVBOX_PATH/bin/devbox" "\$@"
-EOF
-  run chmod +x "$target_dir/devbox"
-  log "Installed the devbox CLI. Run 'devbox' to manage components and databases."
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'export DEVBOX_PATH=%q\n' "$REPO_ROOT"
+    printf 'exec "$DEVBOX_PATH/bin/devbox" "$@"\n'
+  } >"$target_dir/devbox"
+  chmod 0755 "$target_dir/devbox"
+  log "Installed the devbox CLI. Run 'devbox' to manage onboarding and updates."
 
   # Onboarding is first-install work. Updates refresh this helper without
   # replaying credentials or changing service enrollment.
-  if [[ "${DEVBOX_UPDATE:-0}" -eq 0 && ( -n "${DEVBOX_SETUP_GIT_NAME:-}" || -n "${DEVBOX_SETUP_GIT_EMAIL:-}" ) ]]; then
-    if [[ -n "${DEVBOX_SETUP_GIT_NAME:-}" && -n "${DEVBOX_SETUP_GIT_EMAIL:-}" ]]; then
+  if (( ${DEVBOX_UPDATE:-0} == 0 )) && [[ -n ${DEVBOX_SETUP_GIT_NAME:-} || -n ${DEVBOX_SETUP_GIT_EMAIL:-} ]]; then
+    if [[ -n ${DEVBOX_SETUP_GIT_NAME:-} && -n ${DEVBOX_SETUP_GIT_EMAIL:-} ]]; then
       "$target_dir/devbox-setup" git \
         --name "$DEVBOX_SETUP_GIT_NAME" --email "$DEVBOX_SETUP_GIT_EMAIL"
     else
@@ -34,18 +31,19 @@ EOF
     fi
   fi
 
-  if [[ "${DEVBOX_UPDATE:-0}" -eq 0 && -n "${DEVBOX_SETUP_GH_TOKEN:-}" ]]; then
-    printf '%s' "$DEVBOX_SETUP_GH_TOKEN" |
+  if (( ${DEVBOX_UPDATE:-0} == 0 )) && [[ -n ${DEVBOX_SETUP_GH_TOKEN:-} ]]; then
+    printf '%s\n' "$DEVBOX_SETUP_GH_TOKEN" |
       "$target_dir/devbox-setup" github --with-token
   fi
 
-  if [[ "${DEVBOX_UPDATE:-0}" -eq 0 && -n "${DEVBOX_SETUP_TS_AUTH_KEY:-}" ]]; then
-    "$target_dir/devbox-setup" tailscale \
-      --hostname "${DEVBOX_SETUP_TS_HOST:-$(hostname -s)}" \
-      --auth-key "$DEVBOX_SETUP_TS_AUTH_KEY"
+  if (( ${DEVBOX_UPDATE:-0} == 0 )) && [[ -n ${DEVBOX_SETUP_TS_AUTH_KEY:-} ]]; then
+    printf '%s\n' "$DEVBOX_SETUP_TS_AUTH_KEY" |
+      "$target_dir/devbox-setup" tailscale \
+        --hostname "${DEVBOX_SETUP_TS_HOST:-$(hostname -s)}" \
+        --auth-key-stdin
   fi
 
-  if [[ "${DEVBOX_UPDATE:-0}" -eq 0 && -n "${DEVBOX_SETUP_SSH_KEY:-}" ]]; then
+  if (( ${DEVBOX_UPDATE:-0} == 0 )) && [[ -n ${DEVBOX_SETUP_SSH_KEY:-} ]]; then
     "$target_dir/devbox-setup" ssh --key "$DEVBOX_SETUP_SSH_KEY"
   fi
 

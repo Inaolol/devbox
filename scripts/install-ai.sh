@@ -8,12 +8,12 @@ install_ai() {
     "$HOME/.gemini/antigravity-cli/skills" \
     "$HOME/.pi/agent/skills"
 
-  local mise_bin="$HOME/.local/bin/mise"
-  [[ -x "$mise_bin" ]] || mise_bin="$(command -v mise || true)"
-  if [[ -z "$mise_bin" && "${DRY_RUN:-0}" -eq 1 ]]; then
-    mise_bin="$HOME/.local/bin/mise"
+  local mise_bin
+  mise_bin="$(find_mise)"
+  if [[ -z $mise_bin ]] && (( ${DRY_RUN:-0} == 1 )); then
+    mise_bin="/usr/bin/mise"
   fi
-  if [[ -z "$mise_bin" ]]; then
+  if [[ -z $mise_bin ]]; then
     warn "mise was not found. Skipping mise-managed tools."
     return
   fi
@@ -21,7 +21,8 @@ install_ai() {
   # Follow Omaterm's general-purpose tool set while leaving out
   # Basecamp/37signals-specific product tooling. Using mise registry names also
   # lets mise select each tool's supported release artifact.
-  run "$mise_bin" use --global --yes \
+  run_step "Installing AI and development tools via mise" \
+    "$mise_bin" use --global --yes \
     node pi opencode claude-code codex antigravity-cli \
     aqua:modem-dev/hunk
 

@@ -6,7 +6,10 @@ command -v devbox-setup >/dev/null 2>&1 || {
   exit 1
 }
 
-echo "DevBox service onboarding — connects Git, GitHub, Tailscale, and SSH."
-echo "Each step is optional; press Ctrl+C or answer no to skip the rest."
-echo
-devbox-setup
+if (( $# == 0 )); then
+  echo "DevBox service onboarding — connects Git, GitHub, Tailscale, and SSH."
+  echo "Each step is optional; press Ctrl+C or answer no to skip the rest."
+  echo
+fi
+
+exec devbox-setup "$@"

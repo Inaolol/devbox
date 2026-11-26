@@ -1,23 +1,6 @@
 # DevBox
 
-A terminal setup for your headless servers — a home box or a cloud VPS. It
-installs the shell, editors, dev tools, and networking (Tailscale, SSH) you need
-to get productive from the minute you log in, so you don't have to set up a
-fresh Debian or Ubuntu server by hand.
-
-
-## What it sets up
-
-- **Shell**: Bash with [Omadots](https://github.com/omacom-io/omadots), Starship, fzf, eza, zoxide, bat, and tmux
-- **Editors**: Neovim with LazyVim, plus Vim for plain TTY sessions
-- **Agents**: OpenCode, Claude Code, Codex, Antigravity CLI, and Pi
-- **Dev tools**: mise, Node, Docker, Compose, buildx, GitHub CLI (`gh`), lazygit, lazydocker, and Hunk
-- **Networking**: OpenSSH and Tailscale
-- **Git**: Optional setup for user name/email and GitHub authentication
-- **Ad blocking (opt-in)**: AdGuard Home via Docker Compose
-- **Management**: the `devbox` CLI menu plus one-command development databases in Docker
-
-System packages are installed through Debian or Ubuntu repositories wherever possible. Current release binaries are used where the distribution packages do not match Omaterm's requirements. The development and AI tools follow Omaterm's general-purpose tool set while leaving out Basecamp/37signals-specific product tooling.
+DevBox turns a fresh Debian or Ubuntu server into a ready-to-use terminal workspace. One command installs your shell, Herdr, tmux, Neovim, Docker with `lazydocker`, monitoring tools, AI CLIs, and Tailscale.
 
 ## Install
 
@@ -27,68 +10,90 @@ Run this as a normal sudo-enabled user, not as root:
 curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh | bash
 ```
 
-This supports:
+Supported systems:
 
 - Ubuntu Server 24.04 LTS or newer
-- Debian 12 (Bookworm)
-- Debian 13 (Trixie)
-- amd64 and arm64
+- Debian 12 (Bookworm) or Debian 13 (Trixie)
+- `amd64` and `arm64`
 
-Minimal Debian installations must have `curl` and `sudo` installed first, with
-the user configured for sudo access. An SSH key only skips the SSH login
-password: `sudo` still needs this account's password (you will be asked once
-up front), so accounts with no password must set one with `passwd` or allow
-passwordless sudo before installing.
+Minimal Debian installs need `curl` and `sudo` first, with your user in the `sudo` group. An SSH key skips the SSH password prompt, not `sudo`. The installer checks `sudo` once at the start, so accounts without a password need one set via `passwd` or passwordless sudo enabled beforehand.
 
-Open a new login session after installation. DevBox attaches interactive
-terminals to the shared `Work` tmux session. Set `DEVBOX_NO_TMUX=1` before
-starting Bash to skip automatic tmux attachment.
+Open a new login session when it finishes.
 
-## Setup
+## What gets installed
 
-Run the first-time service setup:
+**Multiplexer and shell.** DevBox installs [Herdr](https://herdr.dev) with Omarchy's `ctrl+space` tmux-style keybindings, `tmux` as a fallback, Bash configured from pinned [Omadots](https://github.com/omacom-io/omadots), a Starship prompt that shows `@hostname` over SSH, and JetBrainsMono Nerd Font (`v3.5.1`). You also get `fzf`, `eza`, `zoxide`, `bat`, `ripgrep`, and `fd`.
+
+**Docker.** The installer sets up Docker Engine, Compose, `buildx`, and `lazydocker`. If `/etc/docker/daemon.json` does not exist yet, it writes a `10m` x `5` JSON log rotation policy so container logs do not fill the disk.
+
+**Editors and Git.** Neovim comes with pinned LazyVim starter and `tokyonight`, alongside plain Vim for raw TTY sessions, `lazygit`, and `delta` configured as the default Git pager.
+
+**Server tools and SSH.** You get `btop` for live resource monitoring, `ncdu` for hunting down disk usage, `jq`, and `rsync`. The installer adds SSH client keepalives in `/etc/ssh/ssh_config.d/20-devbox-keepalive.conf` and appends `~/.local/share/mise/shims` and `~/.local/bin` to `/etc/security/pam_env.conf` so non-interactive SSH commands like `herdr --remote` find `mise`-managed tools.
+
+**AI CLIs and networking.** `mise` installs Node, OpenCode, Claude Code, Codex, Antigravity CLI, Pi, and Hunk. Tailscale installs from its official APT repository.
+
+> Over SSH, your local terminal emulator draws the font, not the server. DevBox puts JetBrainsMono Nerd Font in `~/.local/share/fonts/JetBrainsMonoNerdFont` for local tools, and setting your own terminal to JetBrainsMono Nerd Font makes the Starship and Herdr icons render properly.
+
+## SSH login startup (Herdr or tmux)
+
+By default, SSH opens a plain Bash shell. DevBox does not hijack your login unless you ask it to. You can still launch Herdr anytime with `h`, tmux with `t`, or connect directly from your laptop with `herdr --remote user@your-server`.
+
+Turn automatic attachment on or off anytime:
 
 ```bash
-devbox-setup
+devbox setup startup          # interactive picker (off, herdr, or tmux)
+devbox setup startup herdr    # auto-attach Herdr on SSH/login
+devbox setup startup tmux     # auto-attach tmux on SSH/login
+devbox setup startup off      # back to a plain shell
+devbox setup startup status   # print the current setting
 ```
 
-This offers Git identity, GitHub authentication, Tailscale with Tailscale SSH, and SSH public-key setup. Run a section directly when needed:
+To skip auto-attach for a single shell when it is turned on, set `DEVBOX_NO_MULTIPLEXER=1` (or `DEVBOX_NO_HERDR=1` / `DEVBOX_NO_TMUX=1`).
+
+## First-time setup
+
+Run the onboarding helper to connect your accounts and keys:
 
 ```bash
-devbox-setup git
-devbox-setup github
-devbox-setup tailscale
-devbox-setup ssh --key "ssh-ed25519 AAAA..."
+devbox setup
 ```
 
-`devbox-setup` ends with a reminder to run `sudo tailscale up` when Tailscale
-is installed but not yet connected.
-
-Password SSH remains enabled by default. Switch to key-only SSH explicitly after confirming the key works:
+It walks through Git identity, GitHub auth, Tailscale with Tailscale SSH, SSH public keys, and the optional login startup toggle. You can also run any step directly:
 
 ```bash
-devbox-setup ssh \
+devbox setup git
+devbox setup github
+devbox setup tailscale
+devbox setup ssh --key "ssh-ed25519 AAAA..."
+devbox setup startup herdr
+```
+
+The same command is on `PATH` as `devbox-setup`.
+
+Password SSH stays enabled by default. Once you confirm key login works, disable password auth explicitly:
+
+```bash
+devbox setup ssh \
   --key "ssh-ed25519 AAAA..." \
   --disable-password-auth
 ```
 
-The helper validates the key and the resulting OpenSSH configuration before reloading SSH.
+The helper validates both the public key and the resulting `sshd` config before reloading SSH.
 
-## Options
+## Installer options
 
-Pass installer options after `bash -s --`:
+Pass flags after `bash -s --`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh |
   bash -s -- --without-ai
 ```
 
-Available options:
+Available flags:
 
 ```text
 --without-ai
 --without-tailscale
---with-adguard
 --only base
 --only docker
 --only tailscale
@@ -96,153 +101,48 @@ Available options:
 --only ai
 --only configs
 --only services
---only adguard
 --dry-run
-```
-
-AdGuard Home is opt-in so a DevBox install stays a plain devbox unless asked
-for it. `--with-adguard` deploys it during a full install, and `--only adguard`
-installs just the ad blocker on an existing box:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh |
-  bash -s -- --with-adguard
-```
-
-It runs as a Docker Compose service in `~/adguard/docker-compose.yml` (port 53
-for DNS, and 80/3000 for the web admin bound to `127.0.0.1`). After install,
-finish the first-run setup through an SSH tunnel:
-
-```bash
-ssh -L 3000:127.0.0.1:3000 user@your-server
-```
-
-Then open `http://localhost:3000`, and point your router or devices at the
-host's IP to block ads network-wide. Manage it with:
-
-```bash
-docker compose --project-name devbox-adguard -f ~/adguard/docker-compose.yml up -d
-docker compose --project-name devbox-adguard -f ~/adguard/docker-compose.yml logs -f
 ```
 
 ## DevBox CLI
 
-After install, `devbox` opens an interactive menu (Setup, Databases, Windows VM,
-Install, Remove, Update, Help) and also works directly:
+Run `devbox` with no arguments for the interactive menu, or call a subcommand directly:
 
 ```bash
-devbox setup                  # interactive onboarding (same as devbox-setup)
-devbox db postgres redis      # development databases in Docker
-devbox db                     # choose databases interactively
-devbox vm                     # interactive: install, or manage the VM
-devbox vm install             # Windows VM in Docker (dockurr/windows)
-devbox vm launch              # start the VM and print connection details
-devbox install adguard        # optional components: adguard, tailscale, all
-devbox remove tailscale       # remove optional components
-devbox update                 # fetch the latest DevBox and update everything
-devbox help                   # what each command does and what it needs from you
+devbox setup                  # onboarding or subcommands (git, github, tailscale, ssh, startup)
+devbox install tailscale      # install Tailscale, or pass 'all' to re-run all defaults
+devbox remove tailscale       # remove Tailscale
+devbox update                 # pull the latest DevBox and update managed packages
+devbox help                   # show command reference
 ```
 
-`devbox help` documents each command, what it does, and what is needed from
-you before running it.
-
-## Development databases
-
-One command gives you any of the common development databases as Docker
-containers bound to `127.0.0.1` only — nothing is reachable from the network:
-
-```bash
-devbox db mysql postgres mariadb redis mongo mssql
-devbox db remove postgres     # stop and remove a database
-devbox db list                # show installed databases
-```
-
-| Database  | Container   | Port  | Credentials                               |
-|-----------|-------------|-------|-------------------------------------------|
-| MySQL 8.4 | `mysql8`    | 3306  | root, empty password                      |
-| PostgreSQL 18 | `postgres18` | 5432 | trust auth, superuser `postgres`       |
-| MariaDB 11.8 | `mariadb11` | 3306 | root, empty password                    |
-| Redis 7   | `redis`     | 6379  | no password                               |
-| MongoDB   | `mongodb`   | 27017 | admin / admin123                          |
-| MSSQL 2022 | `mssql`    | 1433  | sa / @dmin123 (amd64 only)                |
-
-These are development credentials for local work. Containers restart
-automatically (`unless-stopped`) and keep their data across restarts.
-
-## Windows VM
-
-Run a full Windows install in Docker (via [dockurr/windows]) without
-touching your server OS. Needs KVM (`/dev/kvm`) and about 10GB of free
-space on top of the chosen disk size:
-
-```bash
-devbox vm                     # interactive: install, or manage the VM
-devbox vm install             # pick RAM, cores, disk, version, credentials
-devbox vm launch              # start the VM and wait for Windows to boot
-devbox vm stop                # stop the VM
-devbox vm status              # show VM status
-devbox vm remove              # stop and delete the VM and its data
-```
-
-Windows is downloaded and installed on first start (10-15 minutes);
-watch progress at `http://127.0.0.1:8006`. Unattended installs work
-too via `DEVBOX_VM_RAM`, `DEVBOX_VM_CORES`, `DEVBOX_VM_DISK`,
-`DEVBOX_VM_USER`, `DEVBOX_VM_PASS`, and `DEVBOX_VM_VERSION`.
-
-[dockurr/windows]: https://github.com/dockurr/windows
-
-## Updating
-
-Run the installer again. The bootstrap fetches the current `master` branch and
-updates installed packages and DevBox-managed programs:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Inaolol/devbox/master/bootstrap.sh | bash
-```
-
-Updates preserve existing shell/editor configuration and onboarding state such
-as Git identity, GitHub authentication, Tailscale enrollment, and SSH keys.
-An update refreshes only the tmux and starship configuration from
-fresh Omadots (with timestamped backups of your current files); everything
-else stays as you left it. An explicit `--only configs` run replaces the full
-managed configuration and creates timestamped backups. DevBox records one-time update migrations
-under `~/.local/state/devbox/migrations`, so new releases can change only the
-files or settings that actually need changing.
-
-## Omaterm compatibility
-
-DevBox follows the same setup order as Omaterm:
-
-1. Install the native system and development packages.
-2. Install the official Omadots configuration.
-3. Install Omaterm's mise-managed tools.
-4. Configure Git, GitHub, Tailscale, and SSH.
-5. Enter tmux for interactive terminal work.
-
-The checked-in tmux configuration mirrors current Omadots. Installation uses fresh upstream Omadots as the authoritative source.
-
-Useful aliases include:
+Useful shell aliases:
 
 ```text
+h    launch or attach to Herdr
 t    attach to tmux
 n    open Neovim
 v    open Vim
 d    run Docker
+dc   run Docker Compose
 lzd  open lazydocker
 c    open OpenCode
 cx   open Claude Code
 ```
 
+## Updating
+
+Run `devbox update` or re-run the bootstrap command. Updates pull the latest `master` branch, run any pending one-time migrations in `~/.local/state/devbox/migrations`, and update managed packages.
+
+Updates leave your Git identity, GitHub login, Tailscale state, SSH keys, startup toggle, and custom configs alone. Only `~/.config/herdr/config.toml`, `~/.config/tmux/tmux.conf`, and `~/.config/starship.toml` get refreshed, always with timestamped backups and a diff of what changed. Pass `--only configs` if you want to reset all managed configs instead.
+
 ## Security
 
-The installer does not store API keys or tokens. Unattended setup values are read only when explicitly supplied through `DEVBOX_SETUP_*` environment variables.
+- Docker, Tailscale, GitHub CLI, `gum`, and `mise` come from signed APT repositories. No component script pipes `curl` into `sh`.
+- CLI tools and AI agents install through `mise` with checksum verification, JetBrainsMono Nerd Font checks against a pinned SHA-256 hash, and Omadots plus LazyVim starter are pinned to 40-character commit SHAs.
+- The installer never stores API keys or tokens. Unattended runs read `DEVBOX_SETUP_*` variables, unset them right after use, and pass Tailscale auth keys over stdin and environment instead of command arguments.
+- Install logs live at `~/.local/state/devbox/install.log` with `0600` permissions.
+- DevBox creates empty user-owned skill directories at `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills`, `~/.gemini/antigravity-cli/skills`, and `~/.pi/agent/skills`.
+- Docker-published container ports bypass UFW rules. Restrict exposed ports in Docker's `DOCKER-USER` chain instead of relying on UFW.
 
-DevBox creates empty skill roots at `~/.agents/skills`, `~/.claude/skills`,
-`~/.codex/skills`, and `~/.pi/agent/skills`. It does not install skills into
-them, and updates preserve anything the user adds there.
-
-Docker-published container ports bypass UFW rules. Restrict them through Docker's `DOCKER-USER` chain rather than relying on UFW alone.
-
-DevBox is inspired by [Omarchy](https://github.com/basecamp/omarchy) and
-[Omaterm](https://learn.omacom.io/4/the-omaterm-manual); see their GitHub
-readmes for attribution and the workflows this project builds on.
+DevBox builds on ideas and configs from [Omarchy](https://github.com/basecamp/omarchy) and [Omaterm](https://learn.omacom.io/4/the-omaterm-manual).

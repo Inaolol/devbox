@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+STARTUP_FILE="$HOME/.config/devbox/startup"
+
 usage() {
   cat <<'USAGE'
 Usage:
   devbox-setup                         Run the interactive onboarding
   devbox-setup git [--name NAME --email EMAIL]
   devbox-setup github [--with-token]  Authenticate with GitHub (token is read from stdin)
-  devbox-setup tailscale [--hostname NAME] [--auth-key KEY]
+  devbox-setup tailscale [--hostname NAME] [--auth-key KEY | --auth-key-stdin]
   devbox-setup ssh --key PUBLIC_KEY [--disable-password-auth]
+  devbox-setup startup [herdr|tmux|off|status]
+                                      Toggle auto-attach to herdr or tmux on SSH/login
 
 The SSH command adds a validated public key for regular OpenSSH logins (ssh
 user@host). Tailscale SSH does not need a key; it trusts your tailnet identity.
@@ -27,6 +31,10 @@ need() {
   command -v "$1" >/dev/null 2>&1 || die "$1 is required"
 }
 
+need_arg() {
+  (( $1 >= 2 )) || die "option $2 requires a value"
+}
+
 prompt() {
   local message="$1" value
   [[ -r /dev/tty ]] || die "interactive input requires a terminal"
@@ -40,15 +48,15 @@ confirm() {
   [[ -r /dev/tty ]] || return 1
   printf '%s [y/N] ' "$1" >/dev/tty
   IFS= read -r answer </dev/tty
-  [[ "$answer" == [yY] || "$answer" == [yY][eE][sS] ]]
+  [[ $answer == [yY] || $answer == [yY][eE][sS] ]]
 }
 
 setup_git() {
   local name="" email=""
-  while (($#)); do
+  while (( $# )); do
     case "$1" in
-      --name) name="${2:-}"; shift 2 ;;
-      --email) email="${2:-}"; shift 2 ;;
+      --name) need_arg $# "$1"; name="$2"; shift 2 ;;
+      --email) need_arg $# "$1"; email="$2"; shift 2 ;;
       *) die "unknown git option: $1" ;;
     esac
   done
@@ -58,7 +66,7 @@ setup_git() {
   email="${email:-$(git config --global user.email 2>/dev/null || true)}"
   name="${name:-$(prompt 'Git name: ')}"
   email="${email:-$(prompt 'Git email: ')}"
-  [[ -n "$name" && -n "$email" ]] || die "both Git name and email are required"
+  [[ -n $name && -n $email ]] || die "both Git name and email are required"
   git config --global user.name "$name"
   git config --global user.email "$email"
   echo "✓ Git identity configured for $name <$email>"
@@ -66,7 +74,7 @@ setup_git() {
 
 setup_github() {
   local with_token=0
-  while (($#)); do
+  while (( $# )); do
     case "$1" in
       --with-token) with_token=1; shift ;;
       *) die "unknown github option: $1" ;;
@@ -79,7 +87,7 @@ setup_github() {
     return
   fi
 
-  if ((with_token)); then
+  if (( with_token )); then
     gh auth login --hostname github.com --git-protocol https --with-token
   else
     [[ -t 0 || -r /dev/tty ]] || die "run this command from a terminal, or pipe a token to: devbox-setup github --with-token"
@@ -90,25 +98,31 @@ setup_github() {
 }
 
 valid_hostname() {
-  [[ "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$ ]]
+  [[ $1 =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$ ]]
 }
 
 setup_tailscale() {
-  local hostname="" auth_key=""
-  while (($#)); do
+  local hostname="" auth_key="" auth_key_stdin=0
+  while (( $# )); do
     case "$1" in
-      --hostname) hostname="${2:-}"; shift 2 ;;
-      --auth-key) auth_key="${2:-}"; shift 2 ;;
+      --hostname) need_arg $# "$1"; hostname="$2"; shift 2 ;;
+      --auth-key) need_arg $# "$1"; auth_key="$2"; shift 2 ;;
+      --auth-key-stdin) auth_key_stdin=1; shift ;;
       *) die "unknown tailscale option: $1" ;;
     esac
   done
+
+  if (( auth_key_stdin )); then
+    IFS= read -r auth_key || true
+    [[ -n $auth_key ]] || die "an auth key is required on stdin"
+  fi
 
   need tailscale
   hostname="${hostname:-$(hostname -s)}"
   valid_hostname "$hostname" || die "invalid Tailscale hostname: $hostname"
 
   local args=(up --ssh --accept-routes "--hostname=$hostname")
-  if [[ -z "$auth_key" ]]; then
+  if [[ -z $auth_key ]]; then
     sudo tailscale "${args[@]}"
   else
     # Pass the auth key through the environment, never as a tailscale
@@ -122,23 +136,16 @@ setup_tailscale() {
 }
 
 validate_public_key() {
-  local key="$1" key_file status
-  key_file="$(mktemp)"
-  printf '%s\n' "$key" >"$key_file"
-  if ssh-keygen -l -f "$key_file" >/dev/null 2>&1; then
-    status=0
-  else
-    status=1
-  fi
-  rm -f "$key_file"
-  return "$status"
+  local key="$1"
+  [[ -n $key && $key != *$'\n'* && $key != *$'\r'* ]] || return 1
+  ssh-keygen -l -f - <<<"$key" >/dev/null 2>&1
 }
 
 authorized_keys_has_valid_key() {
   local line
-  [[ -r "$HOME/.ssh/authorized_keys" ]] || return 1
+  [[ -r $HOME/.ssh/authorized_keys ]] || return 1
   while IFS= read -r line; do
-    [[ -z "$line" || "$line" == \#* ]] && continue
+    [[ -z $line || $line == \#* ]] && continue
     if validate_public_key "$line"; then
       return 0
     fi
@@ -153,42 +160,41 @@ disable_password_ssh() {
   # OpenSSH uses the first value it encounters. Debian/Ubuntu include this
   # directory near the top of sshd_config, so sort before vendor/cloud files.
   local dropin="/etc/ssh/sshd_config.d/00-devbox-key-only.conf"
-  local candidate backup=""
-  candidate="$(mktemp)"
-  printf '%s\n' \
-    '# Installed explicitly by devbox-setup ssh --disable-password-auth' \
-    'PasswordAuthentication no' \
-    'KbdInteractiveAuthentication no' >"$candidate"
+  (
+    local candidate="" backup=""
+    trap 'rm -f "${candidate:-}" "${backup:-}"' EXIT
+    candidate="$(mktemp)"
+    printf '%s\n' \
+      '# Installed explicitly by devbox-setup ssh --disable-password-auth' \
+      'PasswordAuthentication no' \
+      'KbdInteractiveAuthentication no' >"$candidate"
 
-  if sudo test -e "$dropin"; then
-    backup="$(mktemp)"
-    sudo cp "$dropin" "$backup"
-  fi
-
-  sudo install -o root -g root -m 0644 "$candidate" "$dropin"
-  if ! sudo sshd -t ||
-    ! sudo sshd -T | grep -qx 'passwordauthentication no' ||
-    ! sudo sshd -T | grep -qx 'kbdinteractiveauthentication no'; then
-    if [[ -n "$backup" ]]; then
-      sudo install -o root -g root -m 0644 "$backup" "$dropin"
-      rm -f "$backup"
-    else
-      sudo rm -f "$dropin"
+    if sudo test -e "$dropin"; then
+      backup="$(mktemp)"
+      sudo cp "$dropin" "$backup"
     fi
-    rm -f "$candidate"
-    die "OpenSSH rejected the configuration; the previous configuration was restored"
-  fi
-  [[ -z "$backup" ]] || rm -f "$backup"
-  rm -f "$candidate"
+
+    sudo install -o root -g root -m 0644 "$candidate" "$dropin"
+    if ! sudo sshd -t ||
+      ! sudo sshd -T | grep -qx 'passwordauthentication no' ||
+      ! sudo sshd -T | grep -qx 'kbdinteractiveauthentication no'; then
+      if [[ -n $backup ]]; then
+        sudo install -o root -g root -m 0644 "$backup" "$dropin"
+      else
+        sudo rm -f "$dropin"
+      fi
+      die "OpenSSH rejected the configuration; the previous configuration was restored"
+    fi
+  )
   sudo systemctl reload ssh
   echo "✓ Password and keyboard-interactive SSH authentication disabled"
 }
 
 setup_ssh() {
   local key="" disable_password=0
-  while (($#)); do
+  while (( $# )); do
     case "$1" in
-      --key) key="${2:-}"; shift 2 ;;
+      --key) need_arg $# "$1"; key="$2"; shift 2 ;;
       --disable-password-auth) disable_password=1; shift ;;
       *) die "unknown ssh option: $1" ;;
     esac
@@ -196,7 +202,7 @@ setup_ssh() {
 
   need ssh-keygen
   key="${key:-$(prompt 'SSH public key (for regular OpenSSH logins, not Tailscale SSH): ')}"
-  [[ -n "$key" ]] || die "an SSH public key is required"
+  [[ -n $key ]] || die "an SSH public key is required"
   validate_public_key "$key" || die "invalid SSH public key"
 
   install -d -m 0700 "$HOME/.ssh"
@@ -207,15 +213,74 @@ setup_ssh() {
   fi
   echo "✓ SSH public key installed"
 
-  if ((disable_password)); then
+  if (( disable_password )); then
     disable_password_ssh
   fi
+}
+
+current_startup_mode() {
+  local mode=""
+  if [[ -r $STARTUP_FILE ]]; then
+    IFS= read -r mode <"$STARTUP_FILE" || true
+  fi
+  case "$mode" in
+    herdr|tmux) printf '%s' "$mode" ;;
+    *) printf 'off' ;;
+  esac
+}
+
+setup_startup() {
+  (( $# <= 1 )) || die "usage: devbox-setup startup [herdr|tmux|off|status]"
+  local mode="${1:-}"
+
+  if [[ $mode == "status" ]]; then
+    echo "Startup auto-attach: $(current_startup_mode)"
+    return 0
+  fi
+
+  if [[ -z $mode ]]; then
+    local current
+    current="$(current_startup_mode)"
+    echo "Current startup auto-attach: $current"
+    if command -v gum >/dev/null 2>&1 && [[ -t 0 || -r /dev/tty ]]; then
+      local choice
+      choice="$(gum choose "Off (plain shell)" "Herdr" "tmux" \
+        --height 5 --header "Auto-attach on SSH/login")" || return 0
+      case "$choice" in
+        "Off"*) mode="off" ;;
+        Herdr) mode="herdr" ;;
+        tmux) mode="tmux" ;;
+        *) return 0 ;;
+      esac
+    else
+      mode="$(prompt "Auto-attach on SSH/login (off/herdr/tmux) [$current]: ")"
+      mode="${mode:-$current}"
+    fi
+  fi
+
+  case "$mode" in
+    off)
+      rm -f "$STARTUP_FILE"
+      echo "✓ Startup auto-attach disabled (plain shell on SSH/login)"
+      ;;
+    herdr|tmux)
+      mkdir -p "$(dirname "$STARTUP_FILE")"
+      printf '%s\n' "$mode" >"$STARTUP_FILE"
+      if ! command -v "$mode" >/dev/null 2>&1; then
+        echo "Warning: '$mode' is not currently on PATH." >&2
+      fi
+      echo "✓ Startup auto-attach set to $mode (applies to new SSH/login shells)"
+      ;;
+    *)
+      die "unknown startup mode: $mode (expected: herdr, tmux, off, status)"
+      ;;
+  esac
 }
 
 interactive_setup() {
   echo "Devbox service onboarding"
   echo
-  if [[ -n "$(git config --global --get user.name 2>/dev/null || true)" && -n "$(git config --global --get user.email 2>/dev/null || true)" ]]; then
+  if [[ -n $(git config --global --get user.name 2>/dev/null || true) && -n $(git config --global --get user.email 2>/dev/null || true) ]]; then
     echo "✓ Git identity is already configured"
   elif confirm "Configure Git identity?"; then
     setup_git
@@ -235,6 +300,13 @@ interactive_setup() {
   elif confirm "Add an SSH public key for regular OpenSSH logins (not Tailscale SSH)?"; then
     setup_ssh
   fi
+  local startup_mode
+  startup_mode="$(current_startup_mode)"
+  if [[ $startup_mode != "off" ]]; then
+    echo "✓ Login auto-attach is set to $startup_mode (change with: devbox setup startup)"
+  elif confirm "Auto-attach Herdr or tmux automatically on SSH login?"; then
+    setup_startup
+  fi
   if command -v tailscale >/dev/null 2>&1 && ! tailscale ip -4 >/dev/null 2>&1; then
     echo
     echo "Tailscale is installed but not connected. Run: sudo tailscale up"
@@ -245,13 +317,14 @@ interactive_setup() {
 }
 
 command="${1:-}"
-[[ -z "$command" ]] || shift
+[[ -z $command ]] || shift
 case "$command" in
   "") interactive_setup ;;
   git) setup_git "$@" ;;
   github) setup_github "$@" ;;
   tailscale) setup_tailscale "$@" ;;
   ssh) setup_ssh "$@" ;;
+  startup) setup_startup "$@" ;;
   -h|--help|help) usage ;;
   *) usage >&2; exit 2 ;;
 esac
