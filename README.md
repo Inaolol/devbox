@@ -119,15 +119,21 @@ devbox help                   # show command reference
 Useful shell aliases:
 
 ```text
-h    launch or attach to Herdr
-t    attach to tmux
-n    open Neovim
-v    open Vim
-d    run Docker
-dc   run Docker Compose
-lzd  open lazydocker
-c    open OpenCode
-cx   open Claude Code
+h          launch or attach to Herdr
+t          attach to tmux
+n          open Neovim
+v          open Vim
+d / dc     run Docker / Docker Compose
+lzd        open lazydocker
+c / cx     open OpenCode / Claude Code
+cy / agy   open Codex / Antigravity CLI
+ic         open Herdr/tmux dev layout with OpenCode
+mup        update all mise tools immediately
+g          run git
+ff         fuzzy-find files with bat preview
+ls / lta   list files / git-aware directory tree (eza)
+cd         smart directory jump (zoxide), plus .. / ... / ....
+cls        clear terminal
 ```
 
 ## Updating

@@ -338,8 +338,54 @@ grep -q 'showGraph' "$ROOT/configs/lazygit/config.yml"
 grep -q "alias lzd='lazydocker'" "$ROOT/configs/shell/devbox-server"
 grep -q "alias h='herdr'" "$ROOT/configs/shell/devbox-server"
 grep -q "alias cls='clear'" "$ROOT/configs/shell/devbox-server"
+grep -q "alias agy='agy --dangerously-skip-permissions'" "$ROOT/configs/shell/devbox-server"
+grep -q "alias mup='MISE_MINIMUM_RELEASE_AGE=0 mise up'" "$ROOT/configs/shell/devbox-server"
+grep -q "alias c='opencode --auto'" "$ROOT/configs/shell/devbox-server"
+grep -q "alias cy='codex --approve-for-me'" "$ROOT/configs/shell/devbox-server"
+grep -q "alias lta='lt -a'" "$ROOT/configs/shell/devbox-server"
+grep -q "alias cd='zd'" "$ROOT/configs/shell/devbox-server"
 # shellcheck disable=SC2016
 grep -q 'export LANG="${LANG:-C.UTF-8}"' "$ROOT/configs/shell/devbox-server"
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  mkdir -p "$work/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$work/bin/eza"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$work/bin/zoxide"
+  chmod +x "$work/bin/eza" "$work/bin/zoxide"
+  PATH="$work/bin:$PATH" bash -c '
+    shopt -s expand_aliases
+    source "$1"
+    alias ls | grep -q "eza -lh"
+    alias lta | grep -q "lt -a"
+    alias cd | grep -q "zd"
+    alias agy | grep -q -- "--dangerously-skip-permissions"
+    alias mup | grep -q "MISE_MINIMUM_RELEASE_AGE=0"
+    alias c | grep -q "opencode --auto"
+    alias cy | grep -q "codex --approve-for-me"
+    alias h | grep -q "herdr"
+    alias cls | grep -q "clear"
+  ' _ "$ROOT/configs/shell/devbox-server"
+)
+# Alias migration adds missing aliases idempotently.
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  HOME="$work"
+  mkdir -p "$HOME/.config/shell"
+  printf "alias h='herdr'\n" >"$HOME/.config/shell/devbox-server"
+  bash "$ROOT/migrations/20261127-devbox-server-aliases.sh"
+  grep -q "alias lta='lt -a'" "$HOME/.config/shell/devbox-server"
+  grep -q "alias cd='zd'" "$HOME/.config/shell/devbox-server"
+  grep -q "alias agy='agy --dangerously-skip-permissions'" "$HOME/.config/shell/devbox-server"
+  grep -q "alias mup='MISE_MINIMUM_RELEASE_AGE=0 mise up'" "$HOME/.config/shell/devbox-server"
+  grep -q "alias c='opencode --auto'" "$HOME/.config/shell/devbox-server"
+  grep -q "alias cy='codex --approve-for-me'" "$HOME/.config/shell/devbox-server"
+  bash "$ROOT/migrations/20261127-devbox-server-aliases.sh"
+  (( $(grep -c "alias agy=" "$HOME/.config/shell/devbox-server") == 1 ))
+  (( $(grep -c "alias lta=" "$HOME/.config/shell/devbox-server") == 1 ))
+  (( $(grep -c "alias cd='zd'" "$HOME/.config/shell/devbox-server") == 1 ))
+)
 grep -q 'C.UTF-8' "$ROOT/migrations/20260731-set-utf8-locale.sh"
 grep -q 'lazygit' "$ROOT/migrations/20260805-install-editor-configs.sh"
 grep -q 'colorscheme.lua' "$ROOT/migrations/20260805-install-editor-configs.sh"
