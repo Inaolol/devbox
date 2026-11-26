@@ -30,7 +30,7 @@ if command -v zoxide >/dev/null 2>&1; then
   }
 fi
 
-alias v='vim'
+alias v='nvim'
 alias d='lazydocker'
 alias lzd='lazydocker'
 alias h='herdr'

@@ -193,16 +193,31 @@ BASHRC
 
 install_devbox_editor_configs() {
   local plugins_dir="$REPO_ROOT/configs/nvim/plugins"
-  local plugin_file target
+  local config_dir="$REPO_ROOT/configs/nvim/config"
+  local file target
 
-  mkdir -p "$HOME/.config/nvim/lua/plugins"
-  for plugin_file in "$plugins_dir"/*.lua; do
-    target="$HOME/.config/nvim/lua/plugins/$(basename "$plugin_file")"
+  mkdir -p "$HOME/.config/nvim/lua/plugins" "$HOME/.config/nvim/lua/config" "$HOME/.config/nvim/plugin/after"
+  for file in "$plugins_dir"/*.lua; do
+    target="$HOME/.config/nvim/lua/plugins/$(basename "$file")"
     if [[ -e $target ]]; then
       backup_path "$target"
     fi
-    install -m 0644 "$plugin_file" "$target"
+    install -m 0644 "$file" "$target"
   done
+
+  for file in "$config_dir"/*.lua; do
+    target="$HOME/.config/nvim/lua/config/$(basename "$file")"
+    if [[ -e $target ]]; then
+      backup_path "$target"
+    fi
+    install -m 0644 "$file" "$target"
+  done
+
+  target="$HOME/.config/nvim/plugin/after/transparency.lua"
+  if [[ -e $target ]]; then
+    backup_path "$target"
+  fi
+  install -m 0644 "$REPO_ROOT/configs/nvim/plugin/after/transparency.lua" "$target"
 
   target="$HOME/.config/lazygit/config.yml"
   if [[ -e $target ]]; then

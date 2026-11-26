@@ -26,7 +26,7 @@ Open a new login session when it finishes.
 
 **Docker.** The installer sets up Docker Engine, Compose, `buildx`, and `lazydocker`. If `/etc/docker/daemon.json` does not exist yet, it writes a `10m` x `5` JSON log rotation policy so container logs do not fill the disk.
 
-**Editors and Git.** Neovim comes with pinned LazyVim starter and `tokyonight`, alongside plain Vim for raw TTY sessions, `lazygit`, and `delta` configured as the default Git pager.
+**Editors and Git.** Neovim comes with pinned LazyVim starter, the `aether` colorscheme, transparent UI/lualine, OSC 52 remote clipboard support for SSH/Herdr/tmux, and `relativenumber` turned off. You also get plain Vim, `lazygit`, and `delta` configured as the default Git pager.
 
 **Server tools and SSH.** You get `btop` for live resource monitoring, `ncdu` for hunting down disk usage, `jq`, `rsync`, and a `~/projects` workspace directory. The installer adds SSH client keepalives in `/etc/ssh/ssh_config.d/20-devbox-keepalive.conf` and appends `~/.local/share/mise/shims` and `~/.local/bin` to `/etc/security/pam_env.conf` so non-interactive SSH commands like `herdr --remote` find `mise`-managed tools.
 
@@ -121,8 +121,7 @@ Useful shell aliases:
 ```text
 h          launch or attach to Herdr
 t          attach to tmux
-n          open Neovim
-v          open Vim
+n / v      open Neovim
 d / lzd    open lazydocker
 dc         run Docker Compose
 c / cx     open OpenCode / Claude Code
