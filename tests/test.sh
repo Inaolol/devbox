@@ -343,7 +343,11 @@ grep -q 'showGraph' "$ROOT/configs/lazygit/config.yml"
 )
 
 # DevBox server shell additions and migrations.
-grep -q "alias v='nvim'" "$ROOT/configs/shell/devbox-server"
+grep -q '^n()' "$ROOT/configs/shell/devbox-server"
+if grep -q "^alias v=" "$ROOT/configs/shell/devbox-server"; then
+  echo "devbox-server must use n() for Neovim instead of alias v=" >&2
+  exit 1
+fi
 grep -q "alias d='lazydocker'" "$ROOT/configs/shell/devbox-server"
 grep -q "alias lzd='lazydocker'" "$ROOT/configs/shell/devbox-server"
 grep -q "alias h='herdr'" "$ROOT/configs/shell/devbox-server"
@@ -374,7 +378,7 @@ grep -q 'export LANG="${LANG:-C.UTF-8}"' "$ROOT/configs/shell/devbox-server"
     alias c | grep -q "opencode --auto"
     alias cy | grep -q "codex --approve-for-me"
     alias d | grep -q "lazydocker"
-    alias v | grep -q "nvim"
+    declare -F n >/dev/null
     alias h | grep -q "herdr"
     alias cls | grep -q "clear"
   ' _ "$ROOT/configs/shell/devbox-server"
@@ -428,6 +432,19 @@ grep -q 'export LANG="${LANG:-C.UTF-8}"' "$ROOT/configs/shell/devbox-server"
   test -f "$HOME/.config/nvim/lua/config/remote_clipboard.lua"
   test -f "$HOME/.config/nvim/plugin/after/transparency.lua"
   compgen -G "$HOME/.config/nvim/lua/plugins/colorscheme.lua.backup.*" >/dev/null
+)
+# Switch from alias v= to n() for Neovim idempotently.
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  HOME="$work"
+  mkdir -p "$HOME/.config/shell"
+  printf "alias v='nvim'\nalias d='lazydocker'\n" >"$HOME/.config/shell/devbox-server"
+  bash "$ROOT/migrations/20261127-use-n-for-nvim.sh"
+  ! grep -q "^alias v=" "$HOME/.config/shell/devbox-server"
+  grep -q '^n()' "$HOME/.config/shell/devbox-server"
+  bash "$ROOT/migrations/20261127-use-n-for-nvim.sh"
+  (( $(grep -c '^n()' "$HOME/.config/shell/devbox-server") == 1 ))
 )
 grep -q 'C.UTF-8' "$ROOT/migrations/20260731-set-utf8-locale.sh"
 grep -q 'lazygit' "$ROOT/migrations/20260805-install-editor-configs.sh"

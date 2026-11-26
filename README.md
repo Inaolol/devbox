@@ -121,7 +121,7 @@ Useful shell aliases:
 ```text
 h          launch or attach to Herdr
 t          attach to tmux
-n / v      open Neovim
+n          open Neovim
 d / lzd    open lazydocker
 dc         run Docker Compose
 c / cx     open OpenCode / Claude Code
