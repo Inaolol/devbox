@@ -15,6 +15,8 @@ install_services() {
   {
     printf '#!/usr/bin/env bash\n'
     printf 'export DEVBOX_PATH=%q\n' "$REPO_ROOT"
+    # Expand DEVBOX_PATH and "$@" when the wrapper runs, not during install.
+    # shellcheck disable=SC2016
     printf 'exec "$DEVBOX_PATH/bin/devbox" "$@"\n'
   } >"$target_dir/devbox"
   chmod 0755 "$target_dir/devbox"

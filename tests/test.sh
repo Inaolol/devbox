@@ -173,6 +173,7 @@ grep -q 'run bash "\$migration"' "$ROOT/scripts/migrations.sh"
   ensure_apt_updated
   ensure_apt_updated
   (( $(wc -l <"$updates") == 1 ))
+  # shellcheck disable=SC2034
   APT_REPOS_DIRTY=1
   ensure_apt_updated
   ensure_apt_updated
@@ -302,6 +303,7 @@ grep -q 'showGraph' "$ROOT/configs/lazygit/config.yml"
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' EXIT
   HOME="$work/home"
+  # shellcheck disable=SC2034
   REPO_ROOT="$ROOT"
   mkdir -p "$HOME/.config/tmux" "$HOME/.config/herdr"
   printf 'old tmux\n' >"$HOME/.config/tmux/tmux.conf"
@@ -361,7 +363,6 @@ grep -q 'tmux new-session -s Work' "$ROOT/migrations/20260917-auto-attach-tmux.s
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' EXIT
   HOME="$work/old"
-  REPO_ROOT="$ROOT"
   mkdir -p "$HOME/.config/shell"
   touch "$HOME/.bashrc" "$HOME/.config/shell/devbox-server"
   bash "$ROOT/migrations/20260917-auto-attach-tmux.sh"
