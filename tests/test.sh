@@ -190,7 +190,9 @@ grep -q '"max-file": "5"' "$ROOT/scripts/install-docker.sh"
 # shellcheck disable=SC2016
 grep -q 'download.docker.com/linux/${OS_ID}' "$ROOT/scripts/install-docker.sh"
 
-# Base ergonomics: SSH keepalives and PAM non-interactive PATH.
+# Base ergonomics: ~/projects, SSH keepalives, and PAM non-interactive PATH.
+# shellcheck disable=SC2016
+grep -q 'mkdir -p "$HOME/projects"' "$ROOT/scripts/install-base.sh"
 grep -q '20-devbox-keepalive.conf' "$ROOT/scripts/install-base.sh"
 grep -q 'ServerAliveInterval 15' "$ROOT/scripts/install-base.sh"
 grep -q 'pam_env.conf' "$ROOT/scripts/install-base.sh"
@@ -336,6 +338,7 @@ grep -q 'showGraph' "$ROOT/configs/lazygit/config.yml"
 )
 
 # DevBox server shell additions and migrations.
+grep -q "alias d='lazydocker'" "$ROOT/configs/shell/devbox-server"
 grep -q "alias lzd='lazydocker'" "$ROOT/configs/shell/devbox-server"
 grep -q "alias h='herdr'" "$ROOT/configs/shell/devbox-server"
 grep -q "alias cls='clear'" "$ROOT/configs/shell/devbox-server"
@@ -364,6 +367,7 @@ grep -q 'export LANG="${LANG:-C.UTF-8}"' "$ROOT/configs/shell/devbox-server"
     alias mup | grep -q "MISE_MINIMUM_RELEASE_AGE=0"
     alias c | grep -q "opencode --auto"
     alias cy | grep -q "codex --approve-for-me"
+    alias d | grep -q "lazydocker"
     alias h | grep -q "herdr"
     alias cls | grep -q "clear"
   ' _ "$ROOT/configs/shell/devbox-server"
@@ -386,6 +390,19 @@ grep -q 'export LANG="${LANG:-C.UTF-8}"' "$ROOT/configs/shell/devbox-server"
   (( $(grep -c "alias agy=" "$HOME/.config/shell/devbox-server") == 1 ))
   (( $(grep -c "alias lta=" "$HOME/.config/shell/devbox-server") == 1 ))
   (( $(grep -c "alias cd='zd'" "$HOME/.config/shell/devbox-server") == 1 ))
+)
+# Projects + d='lazydocker' migration creates ~/projects and adds alias d idempotently.
+(
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  HOME="$work"
+  mkdir -p "$HOME/.config/shell"
+  touch "$HOME/.config/shell/devbox-server"
+  bash "$ROOT/migrations/20261127-projects-and-d-lazydocker.sh"
+  [[ -d $HOME/projects ]]
+  grep -q "^alias d='lazydocker'$" "$HOME/.config/shell/devbox-server"
+  bash "$ROOT/migrations/20261127-projects-and-d-lazydocker.sh"
+  (( $(grep -c "^alias d=" "$HOME/.config/shell/devbox-server") == 1 ))
 )
 grep -q 'C.UTF-8' "$ROOT/migrations/20260731-set-utf8-locale.sh"
 grep -q 'lazygit' "$ROOT/migrations/20260805-install-editor-configs.sh"

@@ -28,7 +28,7 @@ Open a new login session when it finishes.
 
 **Editors and Git.** Neovim comes with pinned LazyVim starter and `tokyonight`, alongside plain Vim for raw TTY sessions, `lazygit`, and `delta` configured as the default Git pager.
 
-**Server tools and SSH.** You get `btop` for live resource monitoring, `ncdu` for hunting down disk usage, `jq`, and `rsync`. The installer adds SSH client keepalives in `/etc/ssh/ssh_config.d/20-devbox-keepalive.conf` and appends `~/.local/share/mise/shims` and `~/.local/bin` to `/etc/security/pam_env.conf` so non-interactive SSH commands like `herdr --remote` find `mise`-managed tools.
+**Server tools and SSH.** You get `btop` for live resource monitoring, `ncdu` for hunting down disk usage, `jq`, `rsync`, and a `~/projects` workspace directory. The installer adds SSH client keepalives in `/etc/ssh/ssh_config.d/20-devbox-keepalive.conf` and appends `~/.local/share/mise/shims` and `~/.local/bin` to `/etc/security/pam_env.conf` so non-interactive SSH commands like `herdr --remote` find `mise`-managed tools.
 
 **AI CLIs and networking.** `mise` installs Node, OpenCode, Claude Code, Codex, Antigravity CLI, Pi, and Hunk. Tailscale installs from its official APT repository.
 
@@ -123,8 +123,8 @@ h          launch or attach to Herdr
 t          attach to tmux
 n          open Neovim
 v          open Vim
-d / dc     run Docker / Docker Compose
-lzd        open lazydocker
+d / lzd    open lazydocker
+dc         run Docker Compose
 c / cx     open OpenCode / Claude Code
 cy / agy   open Codex / Antigravity CLI
 ic         open Herdr/tmux dev layout with OpenCode

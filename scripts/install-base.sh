@@ -50,6 +50,7 @@ EOF
 install_base() {
   log "Installing base packages"
   install_apt_packages ca-certificates curl git gnupg unzip xz-utils rsync build-essential jq openssh-server
+  run mkdir -p "$HOME/projects"
   run_step "Enabling OpenSSH service" sudo systemctl enable --now ssh
   configure_ssh_keepalive
   configure_ssh_command_path
