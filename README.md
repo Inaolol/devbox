@@ -22,7 +22,7 @@ Open a new login session when it finishes.
 
 ## What gets installed
 
-**Multiplexer and shell.** DevBox installs [Herdr](https://herdr.dev) with `ctrl+space` tmux-style keybindings, `tmux` as a fallback, Bash configured from pinned [Omadots](https://github.com/omacom-io/omadots), a Starship prompt that shows `@hostname` over SSH, and JetBrainsMono Nerd Font (`v3.5.1`). You also get `fzf`, `eza`, `zoxide`, `bat`, `ripgrep`, and `fd`.
+**Multiplexer and shell.** DevBox installs [Herdr](https://herdr.dev) with `ctrl+space` tmux-style keybindings, `tmux` as a fallback, Bash configured from pinned [Omadots](https://github.com/omacom-io/omadots), a two-line Starship prompt with your username, directory, and Git status, and JetBrainsMono Nerd Font (`v3.5.1`). You also get `fzf`, `eza`, `zoxide`, `bat`, `ripgrep`, and `fd`.
 
 **Docker.** The installer sets up Docker Engine, Compose, `buildx`, and `lazydocker`. If `/etc/docker/daemon.json` does not exist yet, it writes a `10m` x `5` JSON log rotation policy so container logs do not fill the disk.
 

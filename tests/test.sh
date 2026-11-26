@@ -289,7 +289,8 @@ grep -q 'onboarding = false' "$ROOT/configs/herdr/config.toml"
 grep -q 'accent = "blue"' "$ROOT/configs/herdr/config.toml"
 grep -q 'pane_gaps = false' "$ROOT/configs/herdr/config.toml"
 test -f "$ROOT/configs/starship.toml"
-grep -q 'ssh_only = true' "$ROOT/configs/starship.toml"
+grep -q 'show_always = true' "$ROOT/configs/starship.toml"
+grep -q '╭─' "$ROOT/configs/starship.toml"
 grep -q 'truncation_length = 2' "$ROOT/configs/starship.toml"
 test -f "$ROOT/configs/nvim/plugins/colorscheme.lua"
 test -f "$ROOT/configs/nvim/plugins/disable-news-alert.lua"
@@ -327,7 +328,7 @@ grep -q 'showGraph' "$ROOT/configs/lazygit/config.yml"
   }
   refresh_configs >/dev/null
   grep -q 'new tmux.conf' "$HOME/.config/tmux/tmux.conf"
-  grep -q 'ssh_only = true' "$HOME/.config/starship.toml"
+  grep -q 'show_always = true' "$HOME/.config/starship.toml"
   grep -q 'prefix = "ctrl+space"' "$HOME/.config/herdr/config.toml"
   compgen -G "$HOME/.config/tmux/tmux.conf.backup.*" >/dev/null
   compgen -G "$HOME/.config/starship.toml.backup.*" >/dev/null
